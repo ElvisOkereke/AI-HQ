@@ -11,9 +11,14 @@ const mockChats = [
 ];
 
 type SidebarProps = {
-    activeChatId: string | null;
-    setActiveChatId: (id: string | null) => void;
-    onLogout: () => void;
+  activeChatId: string | null;
+  setActiveChatId: React.Dispatch<React.SetStateAction<string | null>>;
+  onLogout: () => void;
+  user?: {
+    name?: string | null;
+    email?: string | null;
+    image?: string | null;
+  };
 };
 
 export default function Sidebar({ activeChatId, setActiveChatId, onLogout }: SidebarProps) {
