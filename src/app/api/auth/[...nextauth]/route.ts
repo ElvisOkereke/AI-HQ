@@ -3,6 +3,8 @@ import NextAuth from 'next-auth'
 import GithubProvider from 'next-auth/providers/github'
 import GoogleProvider from 'next-auth/providers/google'
 import CredentialsProvider from 'next-auth/providers/credentials'
+import { verifyPass } from '@/app/components/server/db'
+
 
 const handler = NextAuth({
   providers: [
@@ -22,23 +24,35 @@ const handler = NextAuth({
         password: { label: 'Password', type: 'password' }
       },
       async authorize(credentials) {
-        // Add your own authentication logic here
-        // This is just a placeholder - implement your actual auth logic
-        if (credentials?.email && credentials?.password) {
-          // Validate credentials against your database
-          // Return user object if valid, null if invalid
-          return {
-            id: '1',
+        try{
+          if (credentials) {
+          const user = await verifyPass({
             email: credentials.email,
-            name: 'User Name',
+            password: credentials.password
+          });
+          // Ensure only User or null is returned
+          if (user) {
+            // Make sure to return an object with at id, email, and optionally name/image
+            return {
+              id: user.id,
+              email: user.email,
+              name: user.name,
+            };
           }
+          return null;
         }
-        return null
+        return null;
+
+        }catch(error){
+          throw new Error(error instanceof Error ? error.message : String(error));
+        }
+        
       }
     })
   ],
   pages: {
-    signIn: '/api/auth/signIn', // Optional: custom sign-in page
+    signIn: '/',
+    error: '/', // Error page URL
   },
   callbacks: {
     async session({ session, token }) {

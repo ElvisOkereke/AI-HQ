@@ -3,10 +3,15 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Sidebar from './components/client/Sidebar';
 import Chat from "./components/client/Chat";
-import SignInForm from './api/auth/signIn/page';
-import SignUpForm from './api/auth/signUp/page';
+import SignInForm from './components/client/SignIn';
+import SignUpForm from './components/client/SignUp';
 import { Bot } from 'lucide-react';
 import { useSession, signIn, signOut } from "next-auth/react";
+import {
+  QueryClient,
+  QueryClientProvider,
+  useQuery,
+} from '@tanstack/react-query'
 
 export default function HomePage() {
   const { data: session, status } = useSession();
@@ -49,7 +54,7 @@ export default function HomePage() {
           setShowSignInForm(true);
         }}
       />
-    );
+      )
   }
 
   // Show login page if not authenticated
@@ -59,7 +64,7 @@ export default function HomePage() {
         <div className="text-center w-full max-w-sm">
           <Bot className="w-24 h-24 text-purple-400 mx-auto mb-6" />
           <h1 className="text-4xl font-bold mb-2">Welcome to Multi AI Chat</h1>
-          <p className="text-gray-400 mb-8">Log in to begin your conversation with the future of AI.</p>
+          <p className="text-gray-400 mb-8">Sign in to begin your conversation with the future of AI.</p>
           
           {/* OAuth Sign-in buttons */}
           <div className="flex flex-col gap-3 mb-6">
@@ -90,13 +95,20 @@ export default function HomePage() {
 
           {/* Alternative: Credentials sign-in */}
           <div className="border-t border-gray-700 pt-6">
-            <p className="text-gray-400 mb-4">Or sign in with email</p>
+            <p className="text-gray-400 mb-4">Or sign in/up with email</p>
+            <div className="flex gap-3 justify-center">
             <button
               onClick={() => setShowSignInForm(true)}
-              className="px-6 py-3 bg-blue-600 rounded-lg font-semibold hover:bg-blue-500 transition-colors w-full"
+              className="px-10 py-3 bg-blue-600 rounded-lg font-semibold hover:bg-blue-500 transition-colors w-50%"
             >
               Sign In
+            </button><button
+              onClick={() => setShowSignUpForm(true)}
+              className="px-10 py-3 bg-purple-600 rounded-lg font-semibold hover:bg-purple-500 transition-colors w-50%"
+            >
+              Sign Up
             </button>
+            </div>
           </div>
         </div>
       </div>

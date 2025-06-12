@@ -1,11 +1,12 @@
 'use server';
-import {sendMessageToOpenAPI} from '../server/db';
+import { createUser } from '../server/db';
 
-export async function sendMessageAction(gametag: string) {
-  try {
-    const user = await sendMessageToOpenAPI(gametag); //null if not user found in db
-    return { success: true, data: user };
-  } catch (error) {
+
+export async function createUserAction(formData: string) {
+  try{ 
+    const user = await createUser(formData)
+    return { success: true, data: user}
+  }catch(error){
     return { success: false, error: error instanceof Error ? error.message : String(error) };
   }
 }

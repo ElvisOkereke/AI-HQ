@@ -28,13 +28,15 @@ export default function SignInForm({ onBack }: SignInFormProps) {
       });
 
       if (result?.error) {
-        setError('Invalid email or password');
+        setError(result.error);
       } else if (result?.ok) {
         // Success - user will be redirected automatically
         console.log('Sign in successful');
+        // Redirect to home page or dashboard
+        window.location.reload();
       }
     } catch (error) {
-      setError('An error occurred. Please try again.');
+      setError(error instanceof Error ? error.message : 'An unexpected error occurred');
     } finally {
       setIsLoading(false);
     }

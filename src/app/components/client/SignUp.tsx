@@ -2,6 +2,8 @@
 import { useState } from 'react';
 import { signIn } from 'next-auth/react';
 import { Bot, Mail, Lock, ArrowLeft, Eye, EyeOff, User } from 'lucide-react';
+import { createUserAction } from '../actions/dbActions'
+//import argon2 from 'argon2';
 
 interface SignUpFormProps {
   onBack: () => void;
@@ -49,6 +51,8 @@ export default function SignUpForm({ onBack, onSignInClick }: SignUpFormProps) {
       setError('Passwords do not match');
       return false;
     }
+    //formData.password = bcrypt.hash(formData.password,12);
+    //formData.confirmPassword = bcrypt.hash(formData.confirmPassword,12);
     return true;
   };
 
@@ -61,27 +65,22 @@ export default function SignUpForm({ onBack, onSignInClick }: SignUpFormProps) {
       return;
     }
 
+    //const hash = await argon2.hash(formData.password);
+    //formData.password = hash;
+    //formData.confirmPassword = hash;
+
+
     setIsLoading(true);
 
     try {
-      // Call your sign-up API endpoint
-      const response = await fetch('/api/auth/signup', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          name: formData.name,
-          email: formData.email,
-          password: formData.password,
-        }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || 'Something went wrong');
+      // server action
+      const response = await createUserAction(JSON.stringify(formData))
+      let _id;
+      
+      if (!response.success) {
+        throw new Error(response.error || 'Failed to create account');
       }
+      else _id = response.data;
 
       setSuccess('Account created successfully! You can now sign in.');
       
@@ -90,7 +89,7 @@ export default function SignUpForm({ onBack, onSignInClick }: SignUpFormProps) {
         signIn('credentials', {
           email: formData.email,
           password: formData.password,
-          redirect: false,
+          redirect: true,
         });
       }, 1500);
 
@@ -99,6 +98,8 @@ export default function SignUpForm({ onBack, onSignInClick }: SignUpFormProps) {
     } finally {
       setIsLoading(false);
     }
+
+
   };
 
   return (
@@ -140,7 +141,7 @@ export default function SignUpForm({ onBack, onSignInClick }: SignUpFormProps) {
             <input
               type="text"
               name="name"
-              placeholder="Full name"
+              placeholder="Username"
               value={formData.name}
               onChange={handleChange}
               className="w-full pl-12 pr-4 py-3 rounded-lg bg-gray-800 text-white border border-gray-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
