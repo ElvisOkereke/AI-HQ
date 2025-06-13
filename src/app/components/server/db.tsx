@@ -1,5 +1,6 @@
 import 'server-only'
 import { MongoClient, ServerApiVersion } from 'mongodb';
+import { GoogleGenAI } from "@google/genai";
 //import argon2 from 'argon2';
 
 // Extend the global object to include _mongoClientPromise
@@ -35,10 +36,30 @@ export async function getDatabase(dbName = 't3chat') {
     throw error;
   }
 }
+export async function getAI(model: string){
+
+}
 
 export async function getUserByEmail(){
 
 }
+
+export async function sendMessageToGemeni(selectedModel: string, chatHistory: object[]) {
+    try{
+      const ai = new GoogleGenAI({ apiKey: process.env.GOOGLE_API_KEY as string });
+      const response = await ai.models.generateContent({
+      model: selectedModel,
+      contents: "This is the context of user and ai assistant conversation,"+ JSON.stringify(chatHistory) +" continue the conversation with the user by answering the most recent message"
+  });
+      return response.text;
+
+
+    }catch(error){
+      console.error('Error sending message to Gemini:', error);
+      throw new Error(error instanceof Error ? error.message : String(error));
+    }
+}
+
 export async function verifyPass(credentials: { email?: string, password?: string }) {
   
   if (credentials.email && credentials.password) {

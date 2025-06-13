@@ -3,7 +3,8 @@ import React from 'react'
 import { useState, useRef, useEffect } from 'react';
 import { Bot, User, CornerDownLeft, Paperclip, Mic, ChevronDown, WandSparkles } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
-import { sendMessageAction } from '../actions/dbActions'
+import { sendMessageToAIAction } from '../actions/dbActions'
+import { GoogleGenAI } from '@google/genai';
 // Message type definition
 type Message = {
   id: number;
@@ -21,7 +22,8 @@ const mockMessages: Message[] = [
 const llmModels = [
     { id: 'gpt-4o', name: 'GPT-4o', icon: WandSparkles },
     { id: 'claude-3-opus', name: 'Claude 3 Opus', icon: WandSparkles },
-    { id: 'llama-3', name: 'Llama 3', icon: WandSparkles },
+    { id: 'gemini-2.0-flash', name: 'Gemini 2.0', icon: WandSparkles },
+    { id: 'gemini-2.5', name: 'Gemini 2.5 Preview', icon: WandSparkles },
 ];
 
 function WelcomeScreen() {
@@ -43,6 +45,7 @@ export default function Chat({chatId}: {chatId: string | null}) {
   const [isDropdownOpen, setDropdownOpen] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [isSending, setIsSending] = useState(false);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -71,16 +74,52 @@ useEffect(() => {
     }
   }, [chatId]);
 
-  const handleSend = () => {
-    if (input.trim() !== '') {
-      setMessages([...messages, { id: Date.now(), text: input, sender: 'user' }]);
-      setInput('');
-      // Simulate AI response after a short delay
-      setTimeout(() => {
-        setMessages(prev => [...prev, { id: Date.now() + 1, text: `This is a simulated response from ${selectedModel.name}.`, sender: 'ai', isStreaming: true }]);
-      }, 1000);
+ async function sendMessageToGemeni(selectedModel: string, chatHistory: object[]) {
+    try{
+      const ai = new GoogleGenAI({ apiKey: process.env.GOOGLE_API_KEY as string });
+      const response = await ai.models.generateContent({
+      model: selectedModel,
+      contents: "This is the context of user and ai assistant conversation,"+ JSON.stringify(chatHistory) +" continue the conversation with the user by answering the most recent message"
+  });
+      return response.text;
+
+
+    }catch(error){
+      console.error('Error sending message to Gemini:', error);
+      throw new Error(error instanceof Error ? error.message : String(error));
     }
-  };
+}
+
+  const handleSend = async () => {
+      if (input.trim() === '' || isSending) return;
+
+      const userMessage: Message = { id: Date.now(), text: input, sender: 'user' };
+      setMessages(prev => [...prev, userMessage]);
+      setInput('');
+      setIsSending(true);
+
+      // Prepare chat history for the API
+      const chatHistory = [
+          ...messages.map(msg => ({
+              role: msg.sender === 'user' ? 'user' : 'model',
+              parts: msg.text
+          })),
+          { role: 'user', parts: input }
+      ];
+
+      // Call the Server Action
+      const result = await sendMessageToAIAction(selectedModel.id, chatHistory);
+      
+      if (result.success) {
+        const aiMessage: Message = { id: Date.now() + 1, text: result.data ?? 'Something went wrong!\nThere was no response from the model', sender: 'ai' }; 
+        setMessages(prev => [...prev, aiMessage]);
+      } else {
+        // Handle error: show an error message in the chat
+        const errorMessage: Message = { id: Date.now() + 1, text: `Error: ${result.error}`, sender: 'ai' };
+        setMessages(prev => [...prev, errorMessage]);
+      }
+      setIsSending(false);
+    };
 
   const handleKeyPress = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
