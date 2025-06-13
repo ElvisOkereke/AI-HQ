@@ -22,6 +22,8 @@ type SidebarProps = {
 };
 
 export default function Sidebar({ activeChatId, setActiveChatId, onLogout }: SidebarProps) {
+
+
   return (
     <div className="flex flex-col w-72 bg-gray-800 border-r border-gray-700 p-4">
       {/* New Chat Button */}

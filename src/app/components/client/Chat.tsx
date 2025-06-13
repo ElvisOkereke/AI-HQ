@@ -5,6 +5,7 @@ import { Bot, User, CornerDownLeft, Paperclip, Mic, ChevronDown, WandSparkles } 
 import { AnimatePresence, motion } from 'motion/react';
 import { sendMessageToAIAction } from '../actions/dbActions'
 import { GoogleGenAI } from '@google/genai';
+import {readStreamableValue} from 'ai/rsc'
 // Message type definition
 type Message = {
   id: number;
@@ -74,52 +75,73 @@ useEffect(() => {
     }
   }, [chatId]);
 
- async function sendMessageToGemeni(selectedModel: string, chatHistory: object[]) {
-    try{
-      const ai = new GoogleGenAI({ apiKey: process.env.GOOGLE_API_KEY as string });
-      const response = await ai.models.generateContent({
-      model: selectedModel,
-      contents: "This is the context of user and ai assistant conversation,"+ JSON.stringify(chatHistory) +" continue the conversation with the user by answering the most recent message"
-  });
-      return response.text;
-
-
-    }catch(error){
-      console.error('Error sending message to Gemini:', error);
-      throw new Error(error instanceof Error ? error.message : String(error));
-    }
-}
 
   const handleSend = async () => {
-      if (input.trim() === '' || isSending) return;
+    if (input.trim() === '' || isSending) return;
+    setInput('');
+    setIsSending(true);
 
-      const userMessage: Message = { id: Date.now(), text: input, sender: 'user' };
-      setMessages(prev => [...prev, userMessage]);
-      setInput('');
-      setIsSending(true);
-
-      // Prepare chat history for the API
-      const chatHistory = [
-          ...messages.map(msg => ({
-              role: msg.sender === 'user' ? 'user' : 'model',
-              parts: msg.text
-          })),
-          { role: 'user', parts: input }
-      ];
-
-      // Call the Server Action
-      const result = await sendMessageToAIAction(selectedModel.id, chatHistory);
+    const userMessage: Message = { id: Date.now(), text: input, sender: 'user' };
+    setMessages(prev => [...prev, userMessage]);
       
-      if (result.success) {
-        const aiMessage: Message = { id: Date.now() + 1, text: result.data ?? 'Something went wrong!\nThere was no response from the model', sender: 'ai' }; 
-        setMessages(prev => [...prev, aiMessage]);
-      } else {
-        // Handle error: show an error message in the chat
-        const errorMessage: Message = { id: Date.now() + 1, text: `Error: ${result.error}`, sender: 'ai' };
-        setMessages(prev => [...prev, errorMessage]);
-      }
-      setIsSending(false);
+
+    // Prepare chat history for the API
+    const chatHistory = [
+        ...messages.map(msg => ({
+            role: msg.sender === 'user' ? 'user' : 'model',
+            parts: msg.text
+        })),
+        { role: 'user', parts: input }
+    ];
+
+    const aiMessagePlaceholder: Message = {
+      id: (Date.now() + 1),
+      text: '',
+      sender: 'model',
+      isStreaming: true,
     };
+    setMessages(prev => [...prev, aiMessagePlaceholder]);
+
+    // Call the Server Action
+    const result = await sendMessageToAIAction(selectedModel.id, chatHistory) as any;
+    let fullResponse = '';
+
+    
+    
+    if (result.success) {
+      for await (const delta of readStreamableValue(result.data)) {
+        fullResponse += delta;
+        setMessages(prev => {
+          const lastMessage = prev[prev.length - 1];
+          if (lastMessage && lastMessage.sender === 'model') {
+            return [
+              ...prev.slice(0, -1),
+              { ...lastMessage, text: fullResponse},
+            ];
+          }
+          return prev;
+        });
+      }
+       // Finalize the AI message state
+    setMessages(prev => {
+      const lastMessage = prev[prev.length - 1];
+      if (lastMessage && lastMessage.sender === 'model') {
+        return [
+          ...prev.slice(0, -1),
+          { ...lastMessage, text: fullResponse, isStreaming: false },
+        ];
+      }
+      return prev;
+    });
+
+
+    } else {
+      // Handle error: show an error message in the chat
+      const errorMessage: Message = { id: Date.now() + 1, text: `Error: ${result.error}`, sender: 'model' };
+      setMessages(prev => [...prev, errorMessage]);
+    }
+    setIsSending(false);
+  };
 
   const handleKeyPress = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
