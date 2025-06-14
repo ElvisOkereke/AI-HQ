@@ -37,11 +37,33 @@ export async function getDatabase(dbName = 't3chat') {
     throw error;
   }
 }
-export async function getAI(model: string){
+export async function fetchChatsByUser(email: string){
+  try{
+    const db = await getDatabase();
+    const result = await db.collection('chats').findOne({ "email": email });
+    if (result === null) {
+      console.warn('No chats found for user:', email);
+      return [];
+    }
+    return result.chatHistory;
+  }catch (error) {
+    console.error('Error fetching chats by user:', error);
+    throw new Error(error instanceof Error ? error.message : String(error));
+  }
 
 }
 
-export async function getUserByEmail(){
+export async function saveHistoryToDB(chatHistory: object[], user:{name?: string | null, email?: string | null}){
+  try{
+    const db = await getDatabase();
+    const existingChat = await db.collection('chats').insertOne({
+      email: user.email,
+      title:
+      chatHistory: chatHistory
+    })
+  }catch (error){
+
+  }
 
 }
 
@@ -57,7 +79,6 @@ export async function sendMessageToGemeni(selectedModel: string, chatHistory: ob
       for await (const chunk of response){
         const text = chunk.text as string;
         streamable.update(text);
-
       }
 
 

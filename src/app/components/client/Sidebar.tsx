@@ -2,27 +2,53 @@
 
 import { Plus, MessageSquare, LogOut, User } from 'lucide-react';
 import React from 'react';
-
-// Mock data for chat history
-const mockChats = [
-  { id: 'chat-1', title: 'Frontend CSS Help' },
-  { id: 'chat-2', title: 'Python script for automation' },
-  { id: 'chat-3', title: 'Next.js API routes explanation' },
-];
+import { fetchChatsByUserAction } from '../actions/dbActions';
+import { useEffect } from 'react';
 
 type SidebarProps = {
+  chatList: Chat[];
   activeChatId: string | null;
   setActiveChatId: React.Dispatch<React.SetStateAction<string | null>>;
+  setChatList: React.Dispatch<React.SetStateAction<Chat[]>>;
+  setActiveChat: React.Dispatch<React.SetStateAction<Chat | undefined>>;
   onLogout: () => void;
   user?: {
     name?: string | null;
     email?: string | null;
-    image?: string | null;
   };
 };
 
-export default function Sidebar({ activeChatId, setActiveChatId, onLogout }: SidebarProps) {
+type Chat = {
+  _id: string;
+  title: string;
+  email: string;
+  chatHistory: object[];
+}
 
+
+
+export default function Sidebar({ chatList, setChatList, activeChatId, setActiveChatId, onLogout, user }: SidebarProps) {
+  
+  useEffect(() => {
+
+    if(user){// fetch only if user is logged in
+    const fetchAllChats = async () => {
+      const fetchChats = await fetchChatsByUserAction(user.email as string);
+      if (!fetchChats.success) {
+        console.error('Failed to fetch chats:', fetchChats.error);
+        throw new Error(fetchChats.error);
+      }
+      //setActiveChat(fetchChats.data ?? null);
+      setChatList(fetchChats.data ?? []);
+
+    };
+    fetchAllChats();
+    }
+  }, [])
+    
+   
+
+  
 
   return (
     <div className="flex flex-col w-72 bg-gray-800 border-r border-gray-700 p-4">
@@ -38,12 +64,12 @@ export default function Sidebar({ activeChatId, setActiveChatId, onLogout }: Sid
       {/* Chat History */}
       <div className="flex-1 overflow-y-auto space-y-2 pr-2 -mr-2">
         <h2 className="text-sm font-semibold text-gray-400 px-2 mb-2">Recent</h2>
-        {mockChats.map((chat) => (
+        {chatList.map((chat) => (
           <button
-            key={chat.id}
-            onClick={() => setActiveChatId(chat.id)}
+            key={chat._id}
+            onClick={() => setActiveChatId(chat._id)}
             className={`w-full text-left flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${
-              activeChatId === chat.id
+              activeChatId === chat._id
                 ? 'bg-gray-700'
                 : 'hover:bg-gray-700/50'
             }`}

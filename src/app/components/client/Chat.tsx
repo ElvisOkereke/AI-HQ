@@ -4,7 +4,6 @@ import { useState, useRef, useEffect } from 'react';
 import { Bot, User, CornerDownLeft, Paperclip, Mic, ChevronDown, WandSparkles } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { sendMessageToAIAction } from '../actions/dbActions'
-import { GoogleGenAI } from '@google/genai';
 import {readStreamableValue} from 'ai/rsc'
 // Message type definition
 type Message = {
@@ -14,17 +13,27 @@ type Message = {
   isStreaming?: boolean;
 };
 
-// Mock data for demonstration
-const mockMessages: Message[] = [
-  { id: 1, text: "Hello! I'm a Llama 2, ready to assist you. What can I help you with today?", sender: 'ai' },
-  { id: 2, text: "I'm creating a chat app and need help with the frontend.", sender: 'user' },
-];
+type ChatProps = {
+  key: string | null;
+  chatId: string | null;
+  activeChat: Chat | undefined;
+  user?: {
+    name?: string | null;
+    email?: string | null;
+  };
+}
+type Chat = {
+  _id: string;
+  title: string;
+  email: string;
+  chatHistory: object[];
+}
 
 const llmModels = [
-    { id: 'gpt-4o', name: 'GPT-4o', icon: WandSparkles },
-    { id: 'claude-3-opus', name: 'Claude 3 Opus', icon: WandSparkles },
     { id: 'gemini-2.0-flash', name: 'Gemini 2.0', icon: WandSparkles },
     { id: 'gemini-2.5', name: 'Gemini 2.5 Preview', icon: WandSparkles },
+    { id: 'gpt-4o', name: 'GPT-4o', icon: WandSparkles },
+    { id: 'claude-3-opus', name: 'Claude 3 Opus', icon: WandSparkles },
 ];
 
 function WelcomeScreen() {
@@ -39,8 +48,8 @@ function WelcomeScreen() {
     );
 }
 
-export default function Chat({chatId}: {chatId: string | null}) {
-  const [messages, setMessages] = useState<Message[]>(mockMessages);
+export default function Chat({ chatId, activeChat, user }: ChatProps) {
+  const [messages, setMessages] = useState<Message[]>(activeChat?.chatHistory as Message[] || []);
   const [input, setInput] = useState('');
   const [selectedModel, setSelectedModel] = useState(llmModels[0]);
   const [isDropdownOpen, setDropdownOpen] = useState(false);
@@ -65,11 +74,7 @@ export default function Chat({chatId}: {chatId: string | null}) {
 
 useEffect(() => {
     if (chatId) {
-      // In a real app: fetchMessages(chatId);
-      // For demo:
-      setMessages([
-        { id: 1, text: `Loaded conversation for chat ID: ${chatId}. How can I help?`, sender: 'ai' }
-      ]);
+      setMessages(activeChat?.chatHistory as Message[] || []);
     } else {
       setMessages([]);
     }
@@ -77,7 +82,8 @@ useEffect(() => {
 
 
   const handleSend = async () => {
-    if (input.trim() === '' || isSending) return;
+    if (input.trim() === '' || isSending ) return;
+    if (!user) throw new Error('Something went wrong, user not authenticated');
     setInput('');
     setIsSending(true);
 
@@ -103,12 +109,11 @@ useEffect(() => {
     setMessages(prev => [...prev, aiMessagePlaceholder]);
 
     // Call the Server Action
-    const result = await sendMessageToAIAction(selectedModel.id, chatHistory) as any;
+    const result = await sendMessageToAIAction(selectedModel.id, chatHistory, user);
     let fullResponse = '';
-
     
-    
-    if (result.success) {
+    if (result.success && result.data) {
+      //handle stream
       for await (const delta of readStreamableValue(result.data)) {
         fullResponse += delta;
         setMessages(prev => {
@@ -122,17 +127,18 @@ useEffect(() => {
           return prev;
         });
       }
-       // Finalize the AI message state
-    setMessages(prev => {
-      const lastMessage = prev[prev.length - 1];
-      if (lastMessage && lastMessage.sender === 'model') {
-        return [
-          ...prev.slice(0, -1),
-          { ...lastMessage, text: fullResponse, isStreaming: false },
-        ];
-      }
-      return prev;
-    });
+      
+      // Finalize the AI message state
+      setMessages(prev => {
+        const lastMessage = prev[prev.length - 1];
+        if (lastMessage && lastMessage.sender === 'model') {
+          return [
+            ...prev.slice(0, -1),
+            { ...lastMessage, text: fullResponse, isStreaming: false },
+          ];
+        }
+        return prev;
+      });
 
 
     } else {
@@ -153,6 +159,46 @@ useEffect(() => {
   if (!chatId && messages.length === 0) {
     return (
         <div className="flex flex-col h-full bg-gray-900">
+          {/* Header */}
+          <header className="flex items-center justify-between p-4 border-b border-gray-700">
+            <h1 className="text-xl font-bold">Multi AI Chat</h1>
+            <div className="relative">
+                <button
+                    onClick={() => setDropdownOpen(!isDropdownOpen)}
+                    className="flex items-center gap-2 px-3 py-2 bg-gray-800 rounded-lg hover:bg-gray-700 transition-colors"
+                >
+                    <WandSparkles className="w-5 h-5 text-purple-400" />
+                    <span>{selectedModel.name}</span>
+                    <ChevronDown className={`w-4 h-4 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
+                </button>
+                <AnimatePresence>
+                {isDropdownOpen && (
+                    <motion.div
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -10 }}
+                        className="absolute right-0 mt-2 w-48 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-10"
+                    >
+                        {llmModels.map(model => (
+                            <a
+                                key={model.id}
+                                href="#"
+                                onClick={(e) => {
+                                    e.preventDefault();
+                                    setSelectedModel(model);
+                                    setDropdownOpen(false);
+                                }}
+                                className="flex items-center gap-2 px-4 py-2 text-sm text-gray-300 hover:bg-gray-700"
+                            >
+                                <model.icon className="w-4 h-4 text-purple-400"/>
+                                {model.name}
+                            </a>
+                        ))}
+                    </motion.div>
+                )}
+                </AnimatePresence>
+            </div>
+          </header>
             <WelcomeScreen />
             {/* Render the input footer on the welcome screen too */}
             <footer className="p-4">

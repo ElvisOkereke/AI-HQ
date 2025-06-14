@@ -7,15 +7,18 @@ import SignInForm from './components/client/SignIn';
 import SignUpForm from './components/client/SignUp';
 import { Bot } from 'lucide-react';
 import { useSession, signIn, signOut } from "next-auth/react";
-import {
-  QueryClient,
-  QueryClientProvider,
-  useQuery,
-} from '@tanstack/react-query'
 
+type Chat = {
+  _id: string;
+  title: string;
+  email: string;
+  chatHistory: object[];
+}
 export default function HomePage() {
   const { data: session, status } = useSession();
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
+  const [chatList, setChatList] = useState<Chat[]>([]);
+  const [activeChat, setActiveChat] = useState<Chat>();
   const [showSignInForm, setShowSignInForm] = useState(false);
   const [showSignUpForm, setShowSignUpForm] = useState(false);
   const router = useRouter();
@@ -119,14 +122,20 @@ export default function HomePage() {
   return (
     <div className="flex h-screen bg-gray-900 text-white font-sans">
       <Sidebar 
+        chatList={chatList}
         activeChatId={activeChatId} 
         setActiveChatId={setActiveChatId} 
+        setChatList={setChatList}
+        setActiveChat={setActiveChat}
         onLogout={handleLogout}
         user={session.user} // Pass user data to sidebar
       />
       <main className="flex-1 flex flex-col">
-        <Chat key={activeChatId || 'new'} chatId={activeChatId} />
+        <Chat key={activeChatId || 'new'} chatId={activeChatId} activeChat={activeChat} user={session.user}/>
       </main>
     </div>
   );
 }
+
+//TODO add chat history fetch on account basis to sidebar, pass history to chat component, 
+//TODO add more models, show model dropdown on new chat page, syntax highlighting, add logic for resumeable streams when interrupted.  

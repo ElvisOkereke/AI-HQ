@@ -1,7 +1,5 @@
 'use server';
-import { createUser, sendMessageToGemeni} from '../server/db';
-//import { GoogleGenAI } from "@google/genai";
-
+import { createUser, sendMessageToGemeni, fetchChatsByUser, saveHistoryToDB} from '../server/db';
 
 export async function createUserAction(formData: string) {
   try{ 
@@ -11,17 +9,29 @@ export async function createUserAction(formData: string) {
     return { success: false, error: error instanceof Error ? error.message : String(error) };
   }
 }
-export async function sendMessageToAIAction( selectedModel: string, chatHistory: object[]) {
+export async function sendMessageToAIAction( selectedModel: string, chatHistory: object[], user:{name?: string | null, email?: string | null}){
   try{ 
-    let user;
-    if (selectedModel.includes('gemini')) user = await sendMessageToGemeni(selectedModel, chatHistory);
+    let modelResponse;
+    if (selectedModel.includes('gemini')) modelResponse = await sendMessageToGemeni(selectedModel, chatHistory);
     if (selectedModel.includes('gpt')) {
     }
     if (selectedModel.includes('claude')) {
     }
 
-    return { success: true, data: user}
+    await saveHistoryToDB(chatHistory, user)
+
+    return { success: true, data: modelResponse}
   }catch(error){
     return { success: false, error: error instanceof Error ? error.message : String(error) };
   }
+}
+export async function fetchChatsByUserAction(email: string){
+  try{
+    const chats = await fetchChatsByUser(email);
+    return { success: true, data: chats };
+
+  }catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : String(error) };
+  }
+
 }
