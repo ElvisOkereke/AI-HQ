@@ -44,7 +44,7 @@ function WelcomeScreen() {
                 <Bot className="w-12 h-12 text-white" />
             </div>
             <h2 className="text-3xl font-bold text-white">How can I help you today?</h2>
-            {/* You can add example prompts here */}
+            {/* add example prompts here later */}
         </div>
     );
 }
@@ -156,7 +156,6 @@ export default function Chat({ activeChat, user, setActiveChat, setChatList }: C
         return { ...prev, chatHistory: [...prev.chatHistory, errorMessage] };
       });
     } 
-    //console.log(chatToUpdate);
 
     const saveResp = await saveChatToDbAction(chatToUpdate, user);
     if (!saveResp.success) throw new Error("Could not save chat to DB!" + saveResp.error);

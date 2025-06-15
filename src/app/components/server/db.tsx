@@ -75,12 +75,17 @@ export async function saveChatToDb(chat: Chat, user:{name?: string | null, email
   try{
     const db = await getDatabase();
     const isExistingChat = await db.collection('chats').findOne({"email": user.email, "chatList._id": chat._id})
+    const isExistingHistory = await db.collection('chats').findOne({"email": user.email})
     if (isExistingChat === null) {
+      if(isExistingHistory === null){
+           const final = await db.collection('chats').insertOne({"email": user.email, "chatList":[chat]});
+           return ("created new user chat history, result = "+ final.acknowledged);
+      }
       const agg = [{ "$match": { "email": user.email }},{'$addFields': {'chatList': {'$concatArrays': ['$chatList', [chat]]}}}];
       const final = await db.collection('chats').aggregate(agg).toArray();
       const final2 = await db.collection('chats').updateOne({ "email": user.email},{ $set: { "chatList": final[0].chatList}});
       if (!final2.acknowledged) throw new Error("Error updating exisiting chat instance")
-      return ("create new chat for user, result = "+ final2.acknowledged);
+      return ("created new chat for user, result = "+ final2.acknowledged);
     }
     const final = await db.collection('chats').updateOne(
       { "email": user.email, "chatList._id": chat._id },
