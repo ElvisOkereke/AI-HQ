@@ -55,12 +55,15 @@ export function newObjectId(){
 export async function fetchChatsByUser(email: string){
   try{
     const db = await getDatabase();
-    const result = await db.collection('chats').findOne({ "email": email });
+    const result = await db.collection('chats').findOne(
+    { "email": email },
+    { projection: { "chatList": 1, "_id": 0 } } // Project only chats, exclude _id
+  );
     if (result === null) {
       console.warn('No chats found for user:', email);
       return [];
     }
-    return result.chatHistory;
+    return result.toArray() as Chat[];
   }catch (error) {
     console.error('Error fetching chats by user:', error);
     throw new Error(error instanceof Error ? error.message : String(error));
@@ -71,21 +74,17 @@ export async function fetchChatsByUser(email: string){
 export async function saveChatToDb(chat: Chat, user:{name?: string | null, email?: string | null}){
   try{
     const db = await getDatabase();
-    const allChats = await db.collection('chats').findOne({"email": user.email})
-    let existingChat;
-    if (allChats){
-      allChats.chats
-    }
-    
-    if (existingChat === null) {
+    const isExistingChat = await db.collection('chats').findOne({"email": user.email, "chatList._id": chat._id})
+    if (isExistingChat === null) {
       const final = await db.collection('chats').insertOne(chat);
       if (!final.acknowledged) throw new Error("Error inserting new chat instance")
       return;
     }
-    const final = await db.collection('chats').replaceOne({"_id": chat._id}, chat)
+    const final = await db.collection('chats').updateOne({ "email": user.email },[{ $set: { chatList: {$concatArrays: ["chatList",[{chat}]]}}}]);
     if (!final.acknowledged) throw new Error("Error updating exisiting chat instance")
   }catch (error){
-
+    console.error('Error saving to DB:', error);
+    throw new Error(error instanceof Error ? error.message : String(error));
   }
 
 }
@@ -94,7 +93,7 @@ export async function generateTitle(selectedModel: string, userMessage: Message)
       const ai = new GoogleGenAI({ apiKey: process.env.GOOGLE_API_KEY as string });
       const response = await ai.models.generateContent({
       model: selectedModel,
-      contents: "Using this initial user message " + userMessage.content + " create a title for this User to AI chat instance"
+      contents: "Using this initial user message " + userMessage.content + " create and output ONLY a single title for this User to AI chat instance"
       });
       return response.text
     }catch(error){
