@@ -1,10 +1,9 @@
 import 'server-only'
-import { MongoClient, ServerApiVersion } from 'mongodb';
+import { MongoClient, ServerApiVersion, ObjectId } from 'mongodb';
 import { GoogleGenAI } from "@google/genai";
 import { createStreamableValue } from 'ai/rsc'
 //import argon2 from 'argon2';
 
-// Extend the global object to include _mongoClientPromise
 declare global {
   // eslint-disable-next-line no-var
   var _mongoClientPromise: Promise<MongoClient> | undefined;
@@ -12,6 +11,17 @@ declare global {
 let client;
 let clientPromise: Promise<MongoClient> | null = null;
 
+type Chat = {
+  _id: ObjectId;
+  title: string;
+  chatHistory: Message[];
+}
+type Message = {
+  id: number;
+  content: string;
+  role: string;
+  isStreaming?: boolean;
+};
 
 if (!global._mongoClientPromise) {
   client = new MongoClient(process.env.NEXT_PUBLIC_MONGODB_URI as string, {
@@ -26,7 +36,7 @@ if (!global._mongoClientPromise) {
 clientPromise = global._mongoClientPromise;
 export {clientPromise};
 
-// Database utility functions
+// Database utility function
 export async function getDatabase(dbName = 't3chat') {
   try {
     const client = await clientPromise;
@@ -37,6 +47,11 @@ export async function getDatabase(dbName = 't3chat') {
     throw error;
   }
 }
+
+export function newObjectId(){
+  return ObjectId.createFromTime(Math.floor(Date.now()/1000));
+}
+
 export async function fetchChatsByUser(email: string){
   try{
     const db = await getDatabase();
@@ -53,22 +68,46 @@ export async function fetchChatsByUser(email: string){
 
 }
 
-export async function saveHistoryToDB(chatHistory: object[], user:{name?: string | null, email?: string | null}){
+export async function saveChatToDb(chat: Chat, user:{name?: string | null, email?: string | null}){
   try{
     const db = await getDatabase();
-    const existingChat = await db.collection('chats').insertOne({
-      email: user.email,
-      title:
-      chatHistory: chatHistory
-    })
+    const allChats = await db.collection('chats').findOne({"email": user.email})
+    let existingChat;
+    if (allChats){
+      allChats.chats
+    }
+    
+    if (existingChat === null) {
+      const final = await db.collection('chats').insertOne(chat);
+      if (!final.acknowledged) throw new Error("Error inserting new chat instance")
+      return;
+    }
+    const final = await db.collection('chats').replaceOne({"_id": chat._id}, chat)
+    if (!final.acknowledged) throw new Error("Error updating exisiting chat instance")
   }catch (error){
 
   }
 
 }
+export async function generateTitle(selectedModel: string, userMessage: Message){
+  try{
+      const ai = new GoogleGenAI({ apiKey: process.env.GOOGLE_API_KEY as string });
+      const response = await ai.models.generateContent({
+      model: selectedModel,
+      contents: "Using this initial user message " + userMessage.content + " create a title for this User to AI chat instance"
+      });
+      return response.text
+    }catch(error){
+      throw new Error(error instanceof Error ? error.message : String(error))
 
-export async function sendMessageToGemeni(selectedModel: string, chatHistory: object[]) {
-    const streamable = createStreamableValue("");
+  }
+ 
+
+}
+
+export async function sendMessageToGemeni(selectedModel: string, chat: Chat) {
+  const chatHistory = chat.chatHistory;
+  const streamable = createStreamableValue("");
   (async () => {
     try{
       const ai = new GoogleGenAI({ apiKey: process.env.GOOGLE_API_KEY as string });

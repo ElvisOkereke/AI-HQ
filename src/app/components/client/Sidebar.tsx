@@ -1,5 +1,4 @@
 'use client';
-
 import { Plus, MessageSquare, LogOut, User } from 'lucide-react';
 import React from 'react';
 import { fetchChatsByUserAction } from '../actions/dbActions';
@@ -7,8 +6,7 @@ import { useEffect } from 'react';
 
 type SidebarProps = {
   chatList: Chat[];
-  activeChatId: string | null;
-  setActiveChatId: React.Dispatch<React.SetStateAction<string | null>>;
+  activeChat?: Chat;
   setChatList: React.Dispatch<React.SetStateAction<Chat[]>>;
   setActiveChat: React.Dispatch<React.SetStateAction<Chat | undefined>>;
   onLogout: () => void;
@@ -19,18 +17,21 @@ type SidebarProps = {
 };
 
 type Chat = {
-  _id: string;
+  _id: any;
   title: string;
-  email: string;
-  chatHistory: object[];
+  chatHistory: Message[];
 }
+type Message = {
+  id: number;
+  content: string;
+  role: string;
+  isStreaming?: boolean;
+};
 
 
-
-export default function Sidebar({ chatList, setChatList, activeChatId, setActiveChatId, onLogout, user }: SidebarProps) {
+export default function Sidebar({ chatList, setChatList, activeChat, setActiveChat, onLogout, user }: SidebarProps) {
   
   useEffect(() => {
-
     if(user){// fetch only if user is logged in
     const fetchAllChats = async () => {
       const fetchChats = await fetchChatsByUserAction(user.email as string);
@@ -40,7 +41,6 @@ export default function Sidebar({ chatList, setChatList, activeChatId, setActive
       }
       //setActiveChat(fetchChats.data ?? null);
       setChatList(fetchChats.data ?? []);
-
     };
     fetchAllChats();
     }
@@ -48,13 +48,12 @@ export default function Sidebar({ chatList, setChatList, activeChatId, setActive
     
    
 
-  
 
   return (
     <div className="flex flex-col w-72 bg-gray-800 border-r border-gray-700 p-4">
       {/* New Chat Button */}
       <button 
-        onClick={() => setActiveChatId(null)}
+        onClick={() => setActiveChat(undefined)}
         className="flex items-center justify-center gap-2 w-full px-4 py-3 mb-6 bg-blue-600 rounded-lg font-semibold hover:bg-blue-500 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-400"
       >
         <Plus className="w-5 h-5" />
@@ -66,10 +65,10 @@ export default function Sidebar({ chatList, setChatList, activeChatId, setActive
         <h2 className="text-sm font-semibold text-gray-400 px-2 mb-2">Recent</h2>
         {chatList.map((chat) => (
           <button
-            key={chat._id}
-            onClick={() => setActiveChatId(chat._id)}
+            key={chat._id.toString()}
+            onClick={() => setActiveChat(chat)} // this should probbably be setActiveChat(chat) instead
             className={`w-full text-left flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${
-              activeChatId === chat._id
+              activeChat === chat
                 ? 'bg-gray-700'
                 : 'hover:bg-gray-700/50'
             }`}

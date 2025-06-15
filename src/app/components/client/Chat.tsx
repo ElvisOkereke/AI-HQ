@@ -3,19 +3,18 @@ import React from 'react'
 import { useState, useRef, useEffect } from 'react';
 import { Bot, User, CornerDownLeft, Paperclip, Mic, ChevronDown, WandSparkles } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
-import { sendMessageToAIAction } from '../actions/dbActions'
+import { newObjectIdAction, sendMessageToAIAction, generateTitleAction, saveChatToDbAction } from '../actions/dbActions'
 import {readStreamableValue} from 'ai/rsc'
 // Message type definition
 type Message = {
   id: number;
-  text: string;
-  sender: string;
+  content: string;
+  role: string;
   isStreaming?: boolean;
 };
 
 type ChatProps = {
   key: string | null;
-  chatId: string | null;
   activeChat: Chat | undefined;
   user?: {
     name?: string | null;
@@ -23,10 +22,9 @@ type ChatProps = {
   };
 }
 type Chat = {
-  _id: string;
+  _id: any; // this is any because I dont want to import {ObjectId} from mongo on every client component, I think that increases bundle size, im never working with this property, only setting a new one on chat creation
   title: string;
-  email: string;
-  chatHistory: object[];
+  chatHistory: Message[];
 }
 
 const llmModels = [
@@ -48,7 +46,7 @@ function WelcomeScreen() {
     );
 }
 
-export default function Chat({ chatId, activeChat, user }: ChatProps) {
+export default function Chat({ activeChat, user }: ChatProps) {
   const [messages, setMessages] = useState<Message[]>(activeChat?.chatHistory as Message[] || []);
   const [input, setInput] = useState('');
   const [selectedModel, setSelectedModel] = useState(llmModels[0]);
@@ -73,52 +71,60 @@ export default function Chat({ chatId, activeChat, user }: ChatProps) {
   }, [input]);
 
 useEffect(() => {
-    if (chatId) {
-      setMessages(activeChat?.chatHistory as Message[] || []);
+    if (activeChat) {
+      setMessages(activeChat.chatHistory as Message[]);
     } else {
       setMessages([]);
     }
-  }, [chatId]);
+  }, [activeChat]);
 
 
   const handleSend = async () => {
     if (input.trim() === '' || isSending ) return;
-    if (!user) throw new Error('Something went wrong, user not authenticated');
+    if (!user?.email) throw new Error('Something went wrong, user not authenticated');
     setInput('');
     setIsSending(true);
 
-    const userMessage: Message = { id: Date.now(), text: input, sender: 'user' };
+    const userMessage: Message = { id: Date.now(), content: input, role: 'user' };
     setMessages(prev => [...prev, userMessage]);
-      
 
-    // Prepare chat history for the API
-    const chatHistory = [
-        ...messages.map(msg => ({
-            role: msg.sender === 'user' ? 'user' : 'model',
-            parts: msg.text
-        })),
-        { role: 'user', parts: input }
-    ];
+    
+    if(activeChat) activeChat.chatHistory = messages;
+    else{
+      const idResp = await newObjectIdAction()
+      const titleResp = await generateTitleAction(selectedModel.id, userMessage)
+      if(idResp.success && idResp.data && titleResp.success && titleResp.data){
+        const id = idResp.data;
+        const title = titleResp.data;
+        activeChat = {
+          _id: id,
+          title: title,
+          chatHistory: messages,
+        }
+      }else throw new Error("Error creating ID for new chat")
+    }
+    
+    // Call the Server Action
+    const result = await sendMessageToAIAction(selectedModel.id, activeChat, user);
+    let fullResponse = '';
+
 
     const aiMessagePlaceholder: Message = {
       id: (Date.now() + 1),
-      text: '',
-      sender: 'model',
+      content: '',
+      role: 'model',
       isStreaming: true,
     };
     setMessages(prev => [...prev, aiMessagePlaceholder]);
 
-    // Call the Server Action
-    const result = await sendMessageToAIAction(selectedModel.id, chatHistory, user);
-    let fullResponse = '';
-    
+
     if (result.success && result.data) {
       //handle stream
       for await (const delta of readStreamableValue(result.data)) {
         fullResponse += delta;
         setMessages(prev => {
           const lastMessage = prev[prev.length - 1];
-          if (lastMessage && lastMessage.sender === 'model') {
+          if (lastMessage && lastMessage.role === 'model') {
             return [
               ...prev.slice(0, -1),
               { ...lastMessage, text: fullResponse},
@@ -131,7 +137,7 @@ useEffect(() => {
       // Finalize the AI message state
       setMessages(prev => {
         const lastMessage = prev[prev.length - 1];
-        if (lastMessage && lastMessage.sender === 'model') {
+        if (lastMessage && lastMessage.role === 'model') {
           return [
             ...prev.slice(0, -1),
             { ...lastMessage, text: fullResponse, isStreaming: false },
@@ -143,9 +149,14 @@ useEffect(() => {
 
     } else {
       // Handle error: show an error message in the chat
-      const errorMessage: Message = { id: Date.now() + 1, text: `Error: ${result.error}`, sender: 'model' };
+      const errorMessage: Message = { id: Date.now() + 1, content: `Error: ${result.error}`, role: 'model' };
       setMessages(prev => [...prev, errorMessage]);
     }
+    activeChat.chatHistory = messages;
+
+    const saveResp = await saveChatToDbAction(activeChat, user);
+    if (!saveResp.success) throw new Error ("Could not save chat to DB!" + saveResp.error);
+
     setIsSending(false);
   };
 
@@ -156,7 +167,7 @@ useEffect(() => {
     }
   };
 
-  if (!chatId && messages.length === 0) {
+  if (!activeChat) {//show new chat screen
     return (
         <div className="flex flex-col h-full bg-gray-900">
           {/* Header */}
@@ -278,24 +289,24 @@ useEffect(() => {
       {/* Chat Messages */}
       <main className="flex-1 overflow-y-auto p-6 space-y-8">
         {messages.map((msg, index) => (
-          <div key={msg.id} className={`flex items-start gap-4 ${msg.sender === 'user' ? 'justify-end' : ''}`}>
-            {msg.sender === 'ai' && (
+          <div key={msg.id} className={`flex items-start gap-4 ${msg.role === 'user' ? 'justify-end' : ''}`}>
+            {msg.role === 'ai' && (
               <div className="w-10 h-10 flex-shrink-0 flex items-center justify-center bg-gradient-to-br from-purple-500 to-blue-500 rounded-full">
                 <Bot className="w-6 h-6 text-white" />
               </div>
             )}
             <div className={`max-w-xl p-4 rounded-xl ${
-              msg.sender === 'user'
+              msg.role === 'user'
                 ? 'bg-blue-600 rounded-br-none'
                 : 'bg-gray-700 rounded-bl-none'
             }`}>
               <p className="whitespace-pre-wrap">
-                {msg.text}
+                {msg.content}
                 {/* Streaming Indicator */}
                 {msg.isStreaming && <span className="inline-block w-2 h-4 bg-white ml-2 animate-pulse rounded-full" />}
               </p>
             </div>
-             {msg.sender === 'user' && (
+             {msg.role === 'user' && (
               <div className="w-10 h-10 flex-shrink-0 flex items-center justify-center bg-gray-600 rounded-full">
                 <User className="w-6 h-6 text-gray-300" />
               </div>

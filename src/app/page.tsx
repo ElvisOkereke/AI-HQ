@@ -11,9 +11,14 @@ import { useSession, signIn, signOut } from "next-auth/react";
 type Chat = {
   _id: string;
   title: string;
-  email: string;
-  chatHistory: object[];
+  chatHistory: Message[];
 }
+type Message = {
+  id: number;
+  content: string;
+  role: string;
+  isStreaming?: boolean;
+};
 export default function HomePage() {
   const { data: session, status } = useSession();
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
@@ -123,15 +128,14 @@ export default function HomePage() {
     <div className="flex h-screen bg-gray-900 text-white font-sans">
       <Sidebar 
         chatList={chatList}
-        activeChatId={activeChatId} 
-        setActiveChatId={setActiveChatId} 
+        activeChat={activeChat} 
         setChatList={setChatList}
         setActiveChat={setActiveChat}
         onLogout={handleLogout}
         user={session.user} // Pass user data to sidebar
       />
       <main className="flex-1 flex flex-col">
-        <Chat key={activeChatId || 'new'} chatId={activeChatId} activeChat={activeChat} user={session.user}/>
+        <Chat key={activeChat?._id || 'new'} activeChat={activeChat} user={session.user}/>
       </main>
     </div>
   );
