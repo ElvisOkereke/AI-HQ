@@ -1,10 +1,11 @@
 'use client';
-import React from 'react'
+import React, { act } from 'react'
 import { useState, useRef, useEffect } from 'react';
 import { Bot, User, CornerDownLeft, Paperclip, Mic, ChevronDown, WandSparkles } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { newObjectIdAction, sendMessageToAIAction, generateTitleAction, saveChatToDbAction } from '../actions/dbActions'
 import {readStreamableValue} from 'ai/rsc'
+
 // Message type definition
 type Message = {
   id: number;
@@ -20,6 +21,8 @@ type ChatProps = {
     name?: string | null;
     email?: string | null;
   };
+  setActiveChat: React.Dispatch<React.SetStateAction<Chat | undefined>>;
+  setChatList: React.Dispatch<React.SetStateAction<Chat[]>>;
 }
 type Chat = {
   _id: any; // this is any because I dont want to import {ObjectId} from mongo on every client component, I think that increases bundle size, im never working with this property, only setting a new one on chat creation
@@ -46,8 +49,7 @@ function WelcomeScreen() {
     );
 }
 
-export default function Chat({ activeChat, user }: ChatProps) {
-  const [messages, setMessages] = useState<Message[]>(activeChat?.chatHistory as Message[] || []);
+export default function Chat({ activeChat, user, setActiveChat, setChatList }: ChatProps) {
   const [input, setInput] = useState('');
   const [selectedModel, setSelectedModel] = useState(llmModels[0]);
   const [isDropdownOpen, setDropdownOpen] = useState(false);
@@ -61,7 +63,7 @@ export default function Chat({ activeChat, user }: ChatProps) {
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages]);
+  }, [activeChat]);
 
   useEffect(() => {
     if (textareaRef.current) {
@@ -70,92 +72,111 @@ export default function Chat({ activeChat, user }: ChatProps) {
     }
   }, [input]);
 
-useEffect(() => {
-    if (activeChat) {
-      setMessages(activeChat.chatHistory as Message[]);
-    } else {
-      setMessages([]);
-    }
-  }, [activeChat]);
 
 
   const handleSend = async () => {
-    if (input.trim() === '' || isSending ) return;
+    if (input.trim() === '' || isSending) return;
     if (!user?.email) throw new Error('Something went wrong, user not authenticated');
     setInput('');
     setIsSending(true);
 
     const userMessage: Message = { id: Date.now(), content: input, role: 'user' };
-    setMessages(prev => [...prev, userMessage]);
 
-    
-    if(activeChat) activeChat.chatHistory = messages;
-    else{
-      const idResp = await newObjectIdAction()
-      const titleResp = await generateTitleAction(selectedModel.id, userMessage)
-      if(idResp.success && idResp.data && titleResp.success && titleResp.data){
-        const id = idResp.data;
+    let chatToUpdate = activeChat;
+    if (activeChat) {
+      chatToUpdate = { ...activeChat, chatHistory: [...activeChat.chatHistory, userMessage] };
+      setActiveChat(chatToUpdate);
+    } else {
+      const idResp = await newObjectIdAction();
+      const titleResp = await generateTitleAction(selectedModel.id, userMessage);
+      if (idResp.success && idResp.data && titleResp.success && titleResp.data) {
+        const id = JSON.parse(idResp.data);
         const title = titleResp.data;
-        activeChat = {
+        chatToUpdate = {
           _id: id,
           title: title,
-          chatHistory: messages,
-        }
-      }else throw new Error("Error creating ID for new chat")
+          chatHistory: [userMessage],
+        };
+        setActiveChat(chatToUpdate);
+      } else throw new Error("Error creating ID for new chat");
     }
-    
-    // Call the Server Action
-    const result = await sendMessageToAIAction(selectedModel.id, activeChat, user);
-    let fullResponse = '';
 
-
+    // Add AI placeholder message
     const aiMessagePlaceholder: Message = {
-      id: (Date.now() + 1),
+      id: Date.now() + 1,
       content: '',
       role: 'model',
       isStreaming: true,
     };
-    setMessages(prev => [...prev, aiMessagePlaceholder]);
+    chatToUpdate = {
+      ...chatToUpdate!,
+      chatHistory: [...chatToUpdate!.chatHistory, aiMessagePlaceholder],
+    };
+    setActiveChat(chatToUpdate);
 
+    // Call the Server Action
+    const result = await sendMessageToAIAction(selectedModel.id, chatToUpdate, user);
+    let fullResponse = '';
 
     if (result.success && result.data) {
-      //handle stream
+      let lastContent = '';
+      let lastStreaming = true;
       for await (const delta of readStreamableValue(result.data)) {
         fullResponse += delta;
-        setMessages(prev => {
-          const lastMessage = prev[prev.length - 1];
-          if (lastMessage && lastMessage.role === 'model') {
-            return [
-              ...prev.slice(0, -1),
-              { ...lastMessage, text: fullResponse},
-            ];
-          }
-          return prev;
+        lastContent = fullResponse;
+        // Update the AI message in chatHistory
+        setActiveChat(prev => {
+          if (!prev) return prev;
+          const updatedHistory = prev.chatHistory.map((msg, idx) =>
+            idx === prev.chatHistory.length - 1
+              ? { ...msg, content: lastContent, isStreaming: lastStreaming }
+              : msg
+          );
+          return { ...prev, chatHistory: updatedHistory };
         });
       }
-      
       // Finalize the AI message state
-      setMessages(prev => {
-        const lastMessage = prev[prev.length - 1];
-        if (lastMessage && lastMessage.role === 'model') {
-          return [
-            ...prev.slice(0, -1),
-            { ...lastMessage, text: fullResponse, isStreaming: false },
-          ];
-        }
-        return prev;
+      lastStreaming = false;
+      setActiveChat(prev => {
+        if (!prev) return prev;
+        const updatedHistory = prev.chatHistory.map((msg, idx) =>
+          idx === prev.chatHistory.length - 1
+            ? { ...msg, content: lastContent, isStreaming: lastStreaming }
+            : msg
+        );
+        return { ...prev, chatHistory: updatedHistory };
       });
-
-
+      chatToUpdate.chatHistory[chatToUpdate.chatHistory.length-1].content = fullResponse
+      chatToUpdate.chatHistory[chatToUpdate.chatHistory.length-1].isStreaming = false
     } else {
       // Handle error: show an error message in the chat
       const errorMessage: Message = { id: Date.now() + 1, content: `Error: ${result.error}`, role: 'model' };
-      setMessages(prev => [...prev, errorMessage]);
-    }
-    activeChat.chatHistory = messages;
+      setActiveChat(prev => {
+        if (!prev) return prev;
+        return { ...prev, chatHistory: [...prev.chatHistory, errorMessage] };
+      });
+    } 
+    //console.log(chatToUpdate);
 
-    const saveResp = await saveChatToDbAction(activeChat, user);
-    if (!saveResp.success) throw new Error ("Could not save chat to DB!" + saveResp.error);
+    const saveResp = await saveChatToDbAction(chatToUpdate, user);
+    if (!saveResp.success) throw new Error("Could not save chat to DB!" + saveResp.error);
+
+    console.log(saveResp.data);
+
+    setChatList(
+      prev => {
+        const existingIndex = prev.findIndex(chat => chat._id === chatToUpdate._id);
+        if (existingIndex !== -1) {
+          // Update existing chat
+          const updatedChats = [...prev];
+          updatedChats[existingIndex] = chatToUpdate;
+          return updatedChats;
+        } else {
+          // Add new chat
+          return [...prev, chatToUpdate];
+        }
+      }
+    )
 
     setIsSending(false);
   };
@@ -288,7 +309,7 @@ useEffect(() => {
 
       {/* Chat Messages */}
       <main className="flex-1 overflow-y-auto p-6 space-y-8">
-        {messages.map((msg, index) => (
+        {activeChat.chatHistory.map((msg, index) => (
           <div key={msg.id} className={`flex items-start gap-4 ${msg.role === 'user' ? 'justify-end' : ''}`}>
             {msg.role === 'ai' && (
               <div className="w-10 h-10 flex-shrink-0 flex items-center justify-center bg-gradient-to-br from-purple-500 to-blue-500 rounded-full">

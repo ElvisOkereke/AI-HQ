@@ -135,11 +135,16 @@ export default function HomePage() {
         user={session.user} // Pass user data to sidebar
       />
       <main className="flex-1 flex flex-col">
-        <Chat key={activeChat?._id || 'new'} activeChat={activeChat} user={session.user}/>
+        <Chat 
+          key={activeChat?._id || 'new'} 
+          activeChat={activeChat} 
+          setActiveChat={setActiveChat} 
+          setChatList={setChatList} 
+          user={session.user} />
       </main>
     </div>
   );
 }
 
-//TODO add chat history fetch on account basis to sidebar, pass history to chat component, 
+//TODO add chat history fetch on account basis to sidebar, pass history to chat component DONE
 //TODO add more models, show model dropdown on new chat page, syntax highlighting, add logic for resumeable streams when interrupted.  

@@ -49,7 +49,7 @@ export async function getDatabase(dbName = 't3chat') {
 }
 
 export function newObjectId(){
-  return ObjectId.createFromTime(Math.floor(Date.now()/1000));
+  return JSON.stringify(ObjectId.createFromTime(Math.floor(Date.now()/1000)));
 }
 
 export async function fetchChatsByUser(email: string){
@@ -63,7 +63,7 @@ export async function fetchChatsByUser(email: string){
       console.warn('No chats found for user:', email);
       return [];
     }
-    return result.toArray() as Chat[];
+    return result.chatList as Chat[];
   }catch (error) {
     console.error('Error fetching chats by user:', error);
     throw new Error(error instanceof Error ? error.message : String(error));
@@ -76,12 +76,18 @@ export async function saveChatToDb(chat: Chat, user:{name?: string | null, email
     const db = await getDatabase();
     const isExistingChat = await db.collection('chats').findOne({"email": user.email, "chatList._id": chat._id})
     if (isExistingChat === null) {
-      const final = await db.collection('chats').insertOne(chat);
-      if (!final.acknowledged) throw new Error("Error inserting new chat instance")
-      return;
+      const agg = [{ "$match": { "email": user.email }},{'$addFields': {'chatList': {'$concatArrays': ['$chatList', [chat]]}}}];
+      const final = await db.collection('chats').aggregate(agg).toArray();
+      const final2 = await db.collection('chats').updateOne({ "email": user.email},{ $set: { "chatList": final[0].chatList}});
+      if (!final2.acknowledged) throw new Error("Error updating exisiting chat instance")
+      return ("create new chat for user, result = "+ final2.acknowledged);
     }
-    const final = await db.collection('chats').updateOne({ "email": user.email },[{ $set: { chatList: {$concatArrays: ["chatList",[{chat}]]}}}]);
+    const final = await db.collection('chats').updateOne(
+      { "email": user.email, "chatList._id": chat._id },
+      { $set: { "chatList.$.chatHistory": chat.chatHistory} }
+    );
     if (!final.acknowledged) throw new Error("Error updating exisiting chat instance")
+    return ("updated specific chat for user, result = "+ final.acknowledged);
   }catch (error){
     console.error('Error saving to DB:', error);
     throw new Error(error instanceof Error ? error.message : String(error));
@@ -93,7 +99,7 @@ export async function generateTitle(selectedModel: string, userMessage: Message)
       const ai = new GoogleGenAI({ apiKey: process.env.GOOGLE_API_KEY as string });
       const response = await ai.models.generateContent({
       model: selectedModel,
-      contents: "Using this initial user message " + userMessage.content + " create and output ONLY a single title for this User to AI chat instance"
+      contents: "Using this initial user message " + userMessage.content + "output a singular title for this User to AI chat instance, ONLY RESPOND WITH TITLE"
       });
       return response.text
     }catch(error){
