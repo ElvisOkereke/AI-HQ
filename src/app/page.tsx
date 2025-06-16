@@ -146,4 +146,4 @@ export default function HomePage() {
   );
 }
 
-//TODO add more models, syntax highlighting, add logic for resumeable streams when interrupted.  
+//TODO add more models(image gen models), syntax highlighting, add logic for resumeable streams when interrupted, improving model dropdown functionality and looks, upload images and text files, chat sharing (export to pdf), chat branching.  
