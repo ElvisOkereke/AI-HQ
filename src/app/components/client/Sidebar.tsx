@@ -20,6 +20,7 @@ type Chat = {
   _id: any;
   title: string;
   chatHistory: Message[];
+  model: string;
 }
 type Message = {
   id: number;

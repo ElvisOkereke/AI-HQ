@@ -15,6 +15,7 @@ type Chat = {
   _id: ObjectId;
   title: string;
   chatHistory: Message[];
+  model:string
 }
 type Message = {
   id: number;
@@ -81,6 +82,7 @@ export async function saveChatToDb(chat: Chat, user:{name?: string | null, email
            const final = await db.collection('chats').insertOne({"email": user.email, "chatList":[chat]});
            return ("created new user chat history, result = "+ final.acknowledged);
       }
+
       const agg = [{ "$match": { "email": user.email }},{'$addFields': {'chatList': {'$concatArrays': ['$chatList', [chat]]}}}];
       const final = await db.collection('chats').aggregate(agg).toArray();
       const final2 = await db.collection('chats').updateOne({ "email": user.email},{ $set: { "chatList": final[0].chatList}});
@@ -109,9 +111,36 @@ export async function generateTitle(selectedModel: string, userMessage: Message)
       return response.text
     }catch(error){
       throw new Error(error instanceof Error ? error.message : String(error))
-
   }
- 
+}
+
+export async function updateChatModel(chatId: string, newModel: string, user:{name?: string | null, email?: string | null}) {
+  try{
+    
+    const db = await getDatabase();
+
+    // considering converting chatId to ObjectId if it's a string
+    const objectId = typeof chatId === 'string' ? new ObjectId(chatId) : chatId;
+
+    const result = await db.collection('chats').updateOne(
+      { "email": user.email, "chatList._id": chatId },
+      { $set: { "chatList.$.model": newModel} }
+    );
+    if (result.matchedCount === 0) {
+      console.warn('No chat found with ID:', chatId, 'for user:', user.email);
+      throw new Error(`No chat found with ID: ${chatId} for user: ${user.email}`);
+    }
+    if (result.modifiedCount === 0) {
+      console.warn('Chat model already set to:', newModel, 'for chat ID:', chatId);
+      return { matchedCount: result.matchedCount, modifiedCount: 0 };
+    }
+    if (result.acknowledged) return ("done updating chat model, result = "+ result.acknowledged);
+    throw new Error("Error updating chat model");
+
+  }catch (error) {
+    console.error('Error updating chat model:', error);
+    throw new Error(error instanceof Error ? error.message : String(error));
+  }
 
 }
 

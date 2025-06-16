@@ -48,9 +48,9 @@ export const llmModels: LLMModel[] = [
     description: 'Experimental preview with enhanced speed and performance',
     provider: 'Google'
   },
-  {
+ /* {
     id: 'gpt-4o',
-    name: 'GPT-4o',
+    name: 'GPT-4o (DOESNT WORK YET)',
     icon: WandSparkles,
     features: {
       imageUpload: true,
@@ -71,7 +71,7 @@ export const llmModels: LLMModel[] = [
     },
     description: 'Anthropic\'s most capable model for complex tasks and analysis',
     provider: 'Anthropic'
-  },
+  },*/
 ];
 
 type ModelDropdownProps = {

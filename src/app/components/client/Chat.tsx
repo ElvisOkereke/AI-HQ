@@ -1,11 +1,12 @@
 'use client';
-import React, { act } from 'react'
+import React from 'react'
 import { useState, useRef, useEffect } from 'react';
-import { Bot, User, CornerDownLeft, Paperclip, Mic, ChevronDown, WandSparkles } from 'lucide-react';
+import { Bot, User, CornerDownLeft, Paperclip, AlertTriangle } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
-import { newObjectIdAction, sendMessageToAIAction, generateTitleAction, saveChatToDbAction } from '../actions/dbActions'
+import { newObjectIdAction, sendMessageToAIAction, generateTitleAction, saveChatToDbAction, updateChatModelAction } from '../actions/dbActions'
 import {readStreamableValue} from 'ai/rsc'
-import ModelDropdown, { llmModels } from './ModelDropdown';
+import ModelDropdown, {LLMModel, llmModels } from './ModelDropdown';
+
 
 // Message type definition
 type Message = {
@@ -29,7 +30,7 @@ type Chat = {
   _id: any; // this is any because I dont want to import {ObjectId} from mongo on every client component, I think that increases bundle size, im never working with this property, only setting a new one on chat creation
   title: string;
   chatHistory: Message[];
-  //add model parameter to track what model each chat is for
+  model:string
 }
 
 
@@ -45,13 +46,82 @@ function WelcomeScreen() {
     );
 }
 
+// Model Change Confirmation Modal
+function ModelChangeModal({ 
+  isOpen, 
+  onConfirm, 
+  onCancel, 
+  currentModel, 
+  newModel 
+}: {
+  isOpen: boolean;
+  onConfirm: () => void;
+  onCancel: () => void;
+  currentModel: string;
+  newModel: string;
+}) {
+  if (!isOpen) return null;
+
+  const currentModelName = llmModels.find(m => m.id === currentModel)?.name || currentModel;
+  const newModelName = llmModels.find(m => m.id === newModel)?.name || newModel;
+
+  return (
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.9 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="bg-gray-800 border border-gray-700 rounded-xl p-6 max-w-md w-full"
+      >
+        <div className="flex items-start gap-3 mb-4">
+          <AlertTriangle className="w-6 h-6 text-yellow-500 flex-shrink-0 mt-1" />
+          <div>
+            <h3 className="text-lg font-semibold text-white mb-2">Change Chat Model?</h3>
+            <p className="text-gray-300 text-sm">
+              You're switching from <span className="font-medium text-purple-400">{currentModelName}</span> to{' '}
+              <span className="font-medium text-purple-400">{newModelName}</span>.
+            </p>
+            <p className="text-gray-400 text-sm mt-2">
+              This will transfer all conversation context to the new model. The change will be saved permanently.
+            </p>
+          </div>
+        </div>
+        <div className="flex gap-3 justify-end">
+          <button
+            onClick={onCancel}
+            className="px-4 py-2 text-gray-300 hover:text-white transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-lg transition-colors"
+          >
+            Change Model
+          </button>
+        </div>
+      </motion.div>
+    </div>
+  );
+}
+
 export default function Chat({ activeChat, user, setActiveChat, setChatList }: ChatProps) {
   const [input, setInput] = useState('');
   const [selectedModel, setSelectedModel] = useState(llmModels[0]);
-  const [isDropdownOpen, setDropdownOpen] = useState(false);
+  const [showModelChangeModal, setShowModelChangeModal] = useState(false);
+  const [pendingModelChange, setPendingModelChange] = useState<LLMModel | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [isSending, setIsSending] = useState(false);
+
+  // Update selected model when active chat changes
+  useEffect(() => {
+    if (activeChat?.model) {
+      const chatModel = llmModels.find(m => m.id === activeChat.model);
+      if (chatModel) {
+        setSelectedModel(chatModel);
+      }
+    }
+  }, [activeChat]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -68,7 +138,56 @@ export default function Chat({ activeChat, user, setActiveChat, setChatList }: C
     }
   }, [input]);
 
+  const handleModelChange = async (newModel: LLMModel) => {
+    // If no active chat or same model, just update selected model
+    if (!activeChat || activeChat.model === newModel.id) {
+      setSelectedModel(newModel);
+      return;
+    }
 
+    // If different model and existing chat, show confirmation
+    setPendingModelChange(newModel);
+    setShowModelChangeModal(true);
+  };
+
+  const confirmModelChange = async () => {
+    if (!pendingModelChange || !activeChat || !user?.email) return;
+
+    try {
+      // Update chat model in database
+      const updateResult = await updateChatModelAction(activeChat._id, pendingModelChange.id, user);
+      
+      if (updateResult.success) {
+        // Update local state
+        const updatedChat = { ...activeChat, model: pendingModelChange.id };
+        setActiveChat(updatedChat);
+        
+        // Update chat list
+        setChatList(prev => 
+          prev.map(chat => 
+            chat._id === activeChat._id 
+              ? { ...chat, model: pendingModelChange.id }
+              : chat
+          )
+        );
+        
+        setSelectedModel(pendingModelChange);
+      } else {
+        console.error('Failed to update chat model:', updateResult.error);
+        // Optionally show error message to user
+      }
+    } catch (error) {
+      console.error('Error updating chat model:', error);
+    }
+
+    setShowModelChangeModal(false);
+    setPendingModelChange(null);
+  };
+
+  const cancelModelChange = () => {
+    setShowModelChangeModal(false);
+    setPendingModelChange(null);
+  };
 
   const handleSend = async () => {
     if (input.trim() === '' || isSending) return;
@@ -92,6 +211,7 @@ export default function Chat({ activeChat, user, setActiveChat, setChatList }: C
           _id: id,
           title: title,
           chatHistory: [userMessage],
+          model: selectedModel.id, // Set model for new chat
         };
         setActiveChat(chatToUpdate);
       } else throw new Error("Error creating ID for new chat");
@@ -156,8 +276,6 @@ export default function Chat({ activeChat, user, setActiveChat, setChatList }: C
     const saveResp = await saveChatToDbAction(chatToUpdate, user);
     if (!saveResp.success) throw new Error("Could not save chat to DB!" + saveResp.error);
 
-    console.log(saveResp.data);
-
     setChatList(
       prev => {
         const existingIndex = prev.findIndex(chat => chat._id === chatToUpdate._id);
@@ -188,10 +306,11 @@ export default function Chat({ activeChat, user, setActiveChat, setChatList }: C
         <div className="flex flex-col h-full bg-gray-900">
           {/* Header */}
           <header className="flex items-center justify-between p-4 border-b border-gray-700">
-            <h1 className="text-xl font-bold">AI.hq</h1>
-            <div className="relative">
-                <ModelDropdown  selectedModel={selectedModel}  onModelSelect={setSelectedModel} />
-            </div>
+            <h1 className="text-xl font-bold">Multi AI Chat</h1>
+            <ModelDropdown 
+              selectedModel={selectedModel} 
+              onModelSelect={handleModelChange} 
+            />
           </header>
             <WelcomeScreen />
             {/* Render the input footer on the welcome screen too */}
@@ -231,9 +350,10 @@ export default function Chat({ activeChat, user, setActiveChat, setChatList }: C
       {/* Header */}
       <header className="flex items-center justify-between p-4 border-b border-gray-700">
         <h1 className="text-xl font-bold">Multi AI Chat</h1>
-        <div className="relative">
-            <ModelDropdown  selectedModel={selectedModel}  onModelSelect={setSelectedModel} />
-        </div>
+        <ModelDropdown 
+          selectedModel={selectedModel} 
+          onModelSelect={handleModelChange} 
+        />
       </header>
 
       {/* Chat Messages */}
@@ -294,6 +414,15 @@ export default function Chat({ activeChat, user, setActiveChat, setChatList }: C
             </p>
         </div>
       </footer>
+
+      {/* Model Change Confirmation Modal */}
+      <ModelChangeModal
+        isOpen={showModelChangeModal}
+        onConfirm={confirmModelChange}
+        onCancel={cancelModelChange}
+        currentModel={activeChat.model}
+        newModel={pendingModelChange?.id || ''}
+      />
     </div>
   );
 }

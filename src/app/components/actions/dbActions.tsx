@@ -1,10 +1,11 @@
 'use server';
-import { createUser, sendMessageToGemeni, fetchChatsByUser, saveChatToDb, newObjectId, generateTitle} from '../server/db';
+import { createUser, sendMessageToGemeni, fetchChatsByUser, saveChatToDb, newObjectId, generateTitle, updateChatModel} from '../server/db';
 
 type Chat = {
   _id: any;
   title: string;
   chatHistory: Message[];
+  model: string;
 }
 type Message = {
   id: number;
@@ -72,5 +73,19 @@ export async function saveChatToDbAction(chat: Chat, user:{name?: string | null,
     return { success: false, error: error instanceof Error ? error.message : String(error) };
   }
 
+}
+
+export async function updateChatModelAction(chatId: any, newModel: string, user: { name?: string | null; email?: string | null; }): Promise<{ success: boolean; data?: any; error?: string }> {
+  try {
+    if (!user?.email) {
+      return { success: false, error: 'User not authenticated' };
+    }
+    const result = await updateChatModel(chatId, newModel, user);
+
+    return { success: true, data: { chatId, newModel } };
+  } catch (error) {
+    console.error('Error updating chat model:', error);
+    return { success: false, error: error instanceof Error ? error.message : String(error) };
+  }
 }
 
