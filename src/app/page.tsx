@@ -146,5 +146,4 @@ export default function HomePage() {
   );
 }
 
-//TODO add chat history fetch on account basis to sidebar, pass history to chat component DONE
-//TODO add more models, show model dropdown on new chat page, syntax highlighting, add logic for resumeable streams when interrupted.  
+//TODO add more models, syntax highlighting, add logic for resumeable streams when interrupted.  

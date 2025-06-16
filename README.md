@@ -38,7 +38,7 @@ A modern, full-stack AI chat platform built with the T3 stack, featuring intelli
 ## 🛠️ Tech Stack
 
 ### Frontend
-- **Next.js 14** - React framework with App Router
+- **Next.js 15** - React framework with App Router
 - **TypeScript** - Type-safe development
 - **Tailwind CSS** - Utility-first styling
 - **React Hooks** - Modern state management
@@ -50,7 +50,6 @@ A modern, full-stack AI chat platform built with the T3 stack, featuring intelli
 
 ### AI Integration
 - **Google Generative AI** - Powered by Gemini models
-- **Context Management** - Intelligent conversation threading
 - **Error Handling** - Robust AI response management
 
 ## 🚀 Quick Start

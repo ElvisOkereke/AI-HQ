@@ -39,15 +39,11 @@ export default function Sidebar({ chatList, setChatList, activeChat, setActiveCh
         console.error('Failed to fetch chats:', fetchChats.error);
         throw new Error(fetchChats.error);
       }
-      //setActiveChat(fetchChats.data ?? null);
       setChatList(fetchChats.data ?? []);
     };
     fetchAllChats();
     }
   }, [])
-    
-   
-
 
   return (
     <div className="flex flex-col w-72 bg-gray-800 border-r border-gray-700 p-4">
