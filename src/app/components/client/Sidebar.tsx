@@ -82,7 +82,7 @@ export default function Sidebar({ chatList, setChatList, activeChat, setActiveCh
           <div className="w-8 h-8 rounded-full bg-gray-600 flex items-center justify-center">
              <User className="w-5 h-5 text-gray-300"/>
           </div>
-          <span className="font-semibold flex-1">Demo User</span>
+          <span className="font-semibold flex-1">{user?.name ?? "User"}</span>
            <button onClick={onLogout} className="p-2 text-gray-400 hover:text-white hover:bg-gray-600 rounded-md">
                 <LogOut className="w-5 h-5" />
            </button>
