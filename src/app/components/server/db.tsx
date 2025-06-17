@@ -26,6 +26,10 @@ type Message = {
 
 if (!global._mongoClientPromise) {
   client = new MongoClient(process.env.NEXT_PUBLIC_MONGODB_URI as string, {
+  maxPoolSize: 10,
+  serverSelectionTimeoutMS: 5000,
+  socketTimeoutMS: 45000,
+  family: 4,
   serverApi: {
     version: ServerApiVersion.v1,
     strict: true,

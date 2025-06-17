@@ -36,10 +36,9 @@ export async function sendMessageToAIAction( selectedModel: string, chat: Chat, 
   try{ 
     let modelResponse;
     if (selectedModel.includes('gemini')) modelResponse = await sendMessageToGemeni(selectedModel, chat);
-    if (selectedModel.includes('gpt')) {
-    }
-    if (selectedModel.includes('claude')) {
-    }
+    if (selectedModel.includes('llama')) modelResponse = await sendMessageToGemeni(selectedModel, chat);
+    if (selectedModel.includes('deepseek')) modelResponse = await sendMessageToGemeni(selectedModel, chat);
+    
 
     return { success: true, data: modelResponse}
   }catch(error){
