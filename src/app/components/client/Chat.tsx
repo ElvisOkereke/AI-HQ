@@ -40,9 +40,9 @@ function CodeBlock({ code, language }: { code: string; language?: string }) {
   const validLanguage = language && Object.prototype.hasOwnProperty.call(monokaiSublime, language) ? language : 'plaintext';
 
   return (
-    <div className="relative group my-4 w-full text-sm font-sans">
-      {/* Header for the code block */}
-      <div className="flex items-center justify-between bg-gray-800 px-4 py-2 rounded-t-lg border-b border-gray-700 z-10 relative">
+    <div className="group my-4 w-full text-sm font-sans">
+      {/* Sticky header for the code block */}
+      <div className="flex items-center justify-between bg-gray-800 px-4 py-2 rounded-t-lg border-b border-gray-700 sticky top-0 z-10">
         <span className="text-gray-400 font-mono">
           {language || 'code'}
         </span>
