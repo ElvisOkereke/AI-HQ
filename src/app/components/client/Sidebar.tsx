@@ -3,31 +3,7 @@ import { Plus, MessageSquare, LogOut, User } from 'lucide-react';
 import React from 'react';
 import { fetchChatsByUserAction } from '../actions/dbActions';
 import { useEffect } from 'react';
-
-type SidebarProps = {
-  chatList: Chat[];
-  activeChat?: Chat;
-  setChatList: React.Dispatch<React.SetStateAction<Chat[]>>;
-  setActiveChat: React.Dispatch<React.SetStateAction<Chat | undefined>>;
-  onLogout: () => void;
-  user?: {
-    name?: string | null;
-    email?: string | null;
-  };
-};
-
-type Chat = {
-  _id: any;
-  title: string;
-  chatHistory: Message[];
-  model: string;
-}
-type Message = {
-  id: number;
-  content: string;
-  role: string;
-  isStreaming?: boolean;
-};
+import { SidebarProps } from "../../types/types"
 
 
 export default function Sidebar({ chatList, setChatList, activeChat, setActiveChat, onLogout, user }: SidebarProps) {

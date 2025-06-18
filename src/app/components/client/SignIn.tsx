@@ -1,7 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { signIn } from 'next-auth/react';
-import { Bot, Mail, Lock, ArrowLeft, Eye, EyeOff } from 'lucide-react';
+import { Building2, Mail, Lock, ArrowLeft, Eye, EyeOff } from 'lucide-react';
 
 interface SignInFormProps {
   onBack: () => void;
@@ -55,11 +55,11 @@ export default function SignInForm({ onBack }: SignInFormProps) {
           >
             <ArrowLeft className="w-6 h-6" />
           </button>
-          <Bot className="w-16 h-16 text-purple-400" />
+          <Building2 className="w-16 h-16 text-purple-400" />
         </div>
         
         <h1 className="text-3xl font-bold mb-2">Welcome Back</h1>
-        <p className="text-gray-400 mb-8">Sign in to continue to Multi AI Chat</p>
+        <p className="text-gray-400 mb-8">Sign in to continue to AI.HQ</p>
 
         {/* Error Message */}
         {error && (
@@ -145,7 +145,7 @@ export default function SignInForm({ onBack }: SignInFormProps) {
             Continue with GitHub
           </button>
           
-          <button
+          {/*<button
             onClick={() => signIn('google')}
             disabled={isLoading}
             className="flex items-center justify-center gap-2 px-6 py-3 bg-gray-800 rounded-lg font-semibold hover:bg-gray-700 transition-colors disabled:opacity-50"
@@ -159,7 +159,7 @@ export default function SignInForm({ onBack }: SignInFormProps) {
               </g>
             </svg>
             Continue with Google
-          </button>
+          </button>*/}
         </div>
 
         {/* Footer */}

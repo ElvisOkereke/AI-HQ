@@ -1,18 +1,6 @@
 'use server';
-import { createUser, sendMessageToGemeni, fetchChatsByUser, saveChatToDb, newObjectId, generateTitle, updateChatModel} from '../server/db';
-
-type Chat = {
-  _id: any;
-  title: string;
-  chatHistory: Message[];
-  model: string;
-}
-type Message = {
-  id: number;
-  content: string;
-  role: string;
-  isStreaming?: boolean;
-};
+import { createUser, sendMessageToGemeni, fetchChatsByUser, saveChatToDb, newObjectId, generateTitle, updateChatModel, sendMessageToGemeniImage} from '../server/db';
+import { Chat, SidebarProps, Attachment, Message } from "../../types/types"
 
 export async function createUserAction(formData: string) {
   try{ 
@@ -35,7 +23,10 @@ export async function sendMessageToAIAction( selectedModel: string, chat: Chat, 
 
   try{ 
     let modelResponse;
-    if (selectedModel.includes('gemini')) modelResponse = await sendMessageToGemeni(selectedModel, chat);
+    if (selectedModel.includes('gemini')) {
+      if (selectedModel.includes('image')) modelResponse = await sendMessageToGemeniImage(selectedModel, chat);
+      else modelResponse = await sendMessageToGemeni(selectedModel, chat);
+    }
     if (selectedModel.includes('llama')) modelResponse = await sendMessageToGemeni(selectedModel, chat);
     if (selectedModel.includes('deepseek')) modelResponse = await sendMessageToGemeni(selectedModel, chat);
     

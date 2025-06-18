@@ -1,49 +1,48 @@
 import React, { useState } from 'react';
-import { ChevronDown, WandSparkles, Image, Paperclip, Globe, Info } from 'lucide-react';
+import { ChevronDown, WandSparkles, ImagePlus, ImageUp, Paperclip, Globe, Info } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
+import { LLMModel, ModelFeatures} from "../../types/types"
 
 // Export the LLMModel type so it can be used in the parent component
 export type { LLMModel };
 
-type ModelFeatures = {
-  imageGeneration?: boolean;
-  imageUpload?: boolean;
-  fileUpload?: boolean;
-  webSearch?: boolean;
-};
 
-type LLMModel = {
-  id: string;
-  name: string;
-  icon: React.ComponentType<any>;
-  features: ModelFeatures;
-  description: string;
-  provider: string;
-};
 
 export const llmModels: LLMModel[] = [
   {
     id: 'gemini-2.0-flash',
-    name: 'Gemini 2.0',
+    name: 'Gemini 2.0 Flash',
     icon: WandSparkles,
     features: {
-      imageGeneration: true,
+      imageGeneration: false,
       imageUpload: true,
       fileUpload: true,
-      webSearch: true,
+      webSearch: false,
     },
     description: 'Google\'s latest multimodal AI with advanced reasoning and real-time capabilities',
     provider: 'Google'
   },
   {
-    id: 'gemini-2.5-flash-preview-05-20',
+    id: 'gemini-2.5-flash-lite-preview-06-17',
     name: 'Gemini 2.5 Flash Preview',
+    icon: WandSparkles,
+    features: {
+      imageGeneration: false,
+      imageUpload: true,
+      fileUpload: true,
+      webSearch: true,
+    },
+    description: 'Experimental preview with enhanced speed and performance',
+    provider: 'Google'
+  },{
+    id: 'gemini-2.0-flash-preview-image-generation',
+    name: 'Gemini 2.0 Flash Preview Image Generation',
     icon: WandSparkles,
     features: {
       imageGeneration: true,
       imageUpload: true,
       fileUpload: true,
-      webSearch: true,
+      webSearch: false,
     },
     description: 'Experimental preview with enhanced speed and performance',
     provider: 'Google'
@@ -81,16 +80,23 @@ type ModelDropdownProps = {
 
 const FeatureIcon = ({ feature, enabled }: { feature: keyof ModelFeatures; enabled: boolean }) => {
   const icons = {
-    imageGeneration: Image,
-    imageUpload: Image,
+    imageGeneration: ImagePlus,
+    imageUpload: ImageUp,
     fileUpload: Paperclip,
     webSearch: Globe,
   };
-  
+
+  const enabledColors: Record<keyof ModelFeatures, string> = {
+    imageGeneration: 'text-pink-400',
+    imageUpload: 'text-orange-400',
+    fileUpload: 'text-yellow-400',
+    webSearch: 'text-green-400',
+  };
+
   const IconComponent = icons[feature];
   return (
-    <IconComponent 
-      className={`w-4 h-4 ${enabled ? 'text-green-400' : 'text-gray-500'}`} 
+    <IconComponent
+      className={`w-4 h-4 ${enabled ? enabledColors[feature] : 'text-gray-500'}`}
     />
   );
 };

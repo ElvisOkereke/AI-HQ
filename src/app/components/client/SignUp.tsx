@@ -1,7 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { signIn } from 'next-auth/react';
-import { Bot, Mail, Lock, ArrowLeft, Eye, EyeOff, User } from 'lucide-react';
+import { Building2, Mail, Lock, ArrowLeft, Eye, EyeOff, User } from 'lucide-react';
 import { createUserAction } from '../actions/dbActions'
 //import argon2 from 'argon2';
 
@@ -113,11 +113,11 @@ export default function SignUpForm({ onBack, onSignInClick }: SignUpFormProps) {
           >
             <ArrowLeft className="w-6 h-6" />
           </button>
-          <Bot className="w-16 h-16 text-purple-400" />
+          <Building2 className="w-16 h-16 text-purple-400" />
         </div>
         
         <h1 className="text-3xl font-bold mb-2">Create Account</h1>
-        <p className="text-gray-400 mb-8">Join Multi AI Chat to get started</p>
+        <p className="text-gray-400 mb-8">Join AI.HQ to get started</p>
 
         {/* Error Message */}
         {error && (
@@ -274,7 +274,7 @@ export default function SignUpForm({ onBack, onSignInClick }: SignUpFormProps) {
             Continue with GitHub
           </button>
           
-          <button
+          {/*<button
             onClick={() => signIn('google')}
             disabled={isLoading}
             className="flex items-center justify-center gap-2 px-6 py-3 bg-gray-800 rounded-lg font-semibold hover:bg-gray-700 transition-colors disabled:opacity-50"
@@ -288,7 +288,7 @@ export default function SignUpForm({ onBack, onSignInClick }: SignUpFormProps) {
               </g>
             </svg>
             Continue with Google
-          </button>
+          </button>*/}
         </div>
 
         {/* Footer */}

@@ -2,24 +2,13 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Sidebar from './components/client/Sidebar';
-import Chat from "./components/client/Chat";
+import ChatComponent from "./components/client/Chat";
 import SignInForm from './components/client/SignIn';
 import SignUpForm from './components/client/SignUp';
-import { Bot } from 'lucide-react';
+import { Building2 } from 'lucide-react';
 import { useSession, signIn, signOut } from "next-auth/react";
+import { Chat} from "./types/types"
 
-type Chat = {
-  _id: string;
-  title: string;
-  chatHistory: Message[];
-  model: string
-}
-type Message = {
-  id: number;
-  content: string;
-  role: string;
-  isStreaming?: boolean;
-};
 export default function HomePage() {
   const { data: session, status } = useSession();
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
@@ -37,7 +26,7 @@ export default function HomePage() {
     return (
       <div className="flex items-center justify-center h-screen bg-gray-900 text-white">
         <div className="text-center">
-          <Bot className="w-12 h-12 text-purple-400 mx-auto mb-4 animate-pulse" />
+          <Building2 className="w-12 h-12 text-purple-400 mx-auto mb-4 animate-pulse" />
           <p className="text-gray-400">Loading...</p>
         </div>
       </div>
@@ -71,8 +60,8 @@ export default function HomePage() {
     return (
       <div className="flex flex-col items-center justify-center h-screen bg-gray-900 text-white font-sans">
         <div className="text-center w-full max-w-sm">
-          <Bot className="w-24 h-24 text-purple-400 mx-auto mb-6" />
-          <h1 className="text-4xl font-bold mb-2">Welcome to Multi AI Chat</h1>
+          <Building2 className="w-24 h-24 text-purple-400 mx-auto mb-6" />
+          <h1 className="text-4xl font-bold mb-2">Welcome to AI.HQ</h1>
           <p className="text-gray-400 mb-8">Sign in to begin your conversation with the future of AI.</p>
           
           {/* OAuth Sign-in buttons */}
@@ -81,12 +70,12 @@ export default function HomePage() {
               onClick={() => signIn('github')}
               className="flex items-center justify-center gap-2 px-6 py-3 bg-gray-800 rounded-lg font-semibold hover:bg-gray-700 transition-colors"
             >
-              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+              <svg className="w-5 h-8" fill="currentColor" viewBox="0 0 24 24">
                 <path d="M12 .5C5.73.5.5 5.73.5 12c0 5.08 3.29 9.39 7.86 10.91.58.11.79-.25.79-.56 0-.28-.01-1.02-.02-2-3.2.7-3.88-1.54-3.88-1.54-.53-1.34-1.3-1.7-1.3-1.7-1.06-.72.08-.71.08-.71 1.17.08 1.79 1.2 1.79 1.2 1.04 1.78 2.73 1.27 3.4.97.11-.75.41-1.27.74-1.56-2.56-.29-5.26-1.28-5.26-5.7 0-1.26.45-2.29 1.19-3.1-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.18 1.18a11.1 11.1 0 0 1 2.9-.39c.98.01 1.97.13 2.9.39 2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.76.11 3.05.74.81 1.19 1.84 1.19 3.1 0 4.43-2.7 5.41-5.27 5.7.42.36.79 1.09.79 2.2 0 1.59-.01 2.87-.01 3.26 0 .31.21.68.8.56C20.71 21.39 24 17.08 24 12c0-6.27-5.23-11.5-12-11.5z"/>
               </svg>
               Continue with GitHub
             </button>
-            <button
+            {/*<button
               onClick={() => signIn('google')}
               className="flex items-center justify-center gap-2 px-6 py-3 bg-gray-800 rounded-lg font-semibold hover:bg-gray-700 transition-colors"
             >
@@ -99,11 +88,11 @@ export default function HomePage() {
                 </g>
               </svg>
               Continue with Google
-            </button>
+            </button>*/}
           </div>
 
           {/* Alternative: Credentials sign-in */}
-          <div className="border-t border-gray-700 pt-6">
+          <div className="border-t border-gray-700 pt-5">
             <p className="text-gray-400 mb-4">Or sign in/up with email</p>
             <div className="flex gap-3 justify-center">
             <button
@@ -133,10 +122,10 @@ export default function HomePage() {
         setChatList={setChatList}
         setActiveChat={setActiveChat}
         onLogout={handleLogout}
-        user={session.user} // Pass user data to sidebar
+        user={session.user}
       />
       <main className="flex-1 flex flex-col">
-        <Chat 
+        <ChatComponent 
           key={activeChat?._id || 'new'} 
           activeChat={activeChat} 
           setActiveChat={setActiveChat} 
@@ -147,4 +136,4 @@ export default function HomePage() {
   );
 }
 
-//TODO add more models(image gen models), syntax highlighting, add logic for resumeable streams when interrupted, upload images and text files, chat sharing (export to pdf), chat branching.  
+//TODO account/time based rated limit, syntax highlighting, add logic for resumeable streams when interrupted, chat sharing (export to pdf), chat branching, finalize attachments.  
