@@ -136,4 +136,4 @@ export default function HomePage() {
   );
 }
 
-//TODO account/time based rated limit, syntax highlighting, add logic for resumeable streams when interrupted, chat sharing (export to pdf), chat branching, finalize attachments.  
+//TODO account/time based rated limit, add logic for resumeable streams when interrupted, chat sharing (export to pdf), chat branching, finalize attachments.  
