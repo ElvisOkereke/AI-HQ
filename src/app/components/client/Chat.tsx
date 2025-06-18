@@ -1,12 +1,15 @@
+// Chat.tsx
 'use client';
 import React from 'react'
 import { useState, useRef, useEffect } from 'react';
-import { Building2, User, CornerDownLeft, Paperclip, AlertTriangle, X, FileText, Image, CheckCircle, Loader2 } from 'lucide-react';
+import { Building2, User, CornerDownLeft, Paperclip, AlertTriangle, X, FileText, Image, CheckCircle, Loader2, Copy, Check } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { newObjectIdAction, sendMessageToAIAction, generateTitleAction, saveChatToDbAction, updateChatModelAction } from '../actions/dbActions'
 import { readStreamableValue } from 'ai/rsc'
 import ModelDropdown, { llmModels } from './ModelDropdown';
 import { ChatProps, Attachment, Message, LLMModel } from "../../types/types"
+import SyntaxHighlighter from 'react-syntax-highlighter';
+import { monokaiSublime } from 'react-syntax-highlighter/dist/esm/styles/hljs'; // Import Monokai Sublime
 
 function WelcomeScreen() {
     return (
@@ -19,6 +22,228 @@ function WelcomeScreen() {
         </div>
     );
 }
+
+// Code Block Component with Monokai Pro Styling for SyntaxHighlighter
+function CodeBlock({ code, language }: { code: string; language?: string }) {
+  const [copied, setCopied] = useState(false);
+
+  const copyToClipboard = async () => {
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy code:', err);
+    }
+  };
+
+  const validLanguage = language && Object.prototype.hasOwnProperty.call(monokaiSublime, language) ? language : 'plaintext';
+
+  return (
+    <div className="relative group my-4 w-full text-sm font-sans">
+      {/* Header for the code block */}
+      <div className="flex items-center justify-between bg-gray-800 px-4 py-2 rounded-t-lg border-b border-gray-700 z-10 relative">
+        <span className="text-gray-400 font-mono">
+          {language || 'code'}
+        </span>
+        <button
+          onClick={copyToClipboard}
+          className="flex items-center gap-2 px-3 py-1 text-gray-400 hover:text-white bg-gray-700 hover:bg-gray-600 rounded transition-colors"
+        >
+          {copied ? (
+            <>
+              <Check className="w-4 h-4" />
+              Copied!
+            </>
+          ) : (
+            <>
+              <Copy className="w-4 h-4" />
+              Copy
+            </>
+          )}
+        </button>
+      </div>
+      {/* SyntaxHighlighter for the code content */}
+      <SyntaxHighlighter
+        language={validLanguage}
+        style={monokaiSublime}
+        customStyle={{
+          padding: '1rem',
+          margin: '0', 
+          borderRadius: '0 0 0.5rem 0.5rem',
+          overflowX: 'auto', 
+          maxHeight: '400px', 
+          border: '1px solid #383830', 
+          borderTop: 'none',
+          backgroundColor: '#272822', 
+        }}
+        codeTagProps={{ className: 'font-mono' }} 
+      >
+        {code}
+      </SyntaxHighlighter>
+    </div>
+  );
+}
+
+// Enhanced Message Content Component with Markdown-like formatting
+function MessageContent({ content }: { content: string }) {
+  const parseContent = (text: string) => {
+    const parts: Array<{ type: string; content: string; language?: string; key: string }> = [];
+    const codeBlockRegex = /```(\w+)?\n?([\s\S]*?)```/g;
+    let lastIndex = 0;
+    let match;
+
+    while ((match = codeBlockRegex.exec(text)) !== null) {
+      if (match.index > lastIndex) {
+        parts.push({
+          type: 'text',
+          content: text.substring(lastIndex, match.index),
+          key: `text-${lastIndex}`
+        });
+      }
+
+      parts.push({
+        type: 'codeblock',
+        content: match[2].trim(),
+        language: match[1] || undefined,
+        key: `code-${match.index}`
+      });
+
+      lastIndex = match.index + match[0].length;
+    }
+
+    if (lastIndex < text.length) {
+      parts.push({
+        type: 'text',
+        content: text.substring(lastIndex),
+        key: `text-${lastIndex}`
+      });
+    }
+
+    return parts.length > 0 ? parts : [{ type: 'text', content: text, key: 'text-0' }];
+  };
+
+  const renderInlineFormatting = (text: string): (React.ReactNode | string)[] => {
+    const parts: (React.ReactNode | string)[] = [];
+    let currentIndex = 0;
+    const inlineRegex = /(`[^`]+`)|(\*\*[^*]+\*\*)|(__[^_]+__)|(\*[^*]+\*)|(\_[^_]+\_)/g;
+    let match;
+
+    while ((match = inlineRegex.exec(text)) !== null) {
+      if (match.index > currentIndex) {
+        parts.push(text.substring(currentIndex, match.index));
+      }
+
+      const fullMatch = match[0];
+      
+      if (fullMatch.startsWith('`') && fullMatch.endsWith('`')) {
+        parts.push(
+          <code key={`inline-code-${match.index}`} className="bg-gray-800 text-blue-300 px-1.5 py-0.5 rounded text-xs font-mono">
+            {fullMatch.slice(1, -1)}
+          </code>
+        );
+      } else if ((fullMatch.startsWith('**') && fullMatch.endsWith('**')) || (fullMatch.startsWith('__') && fullMatch.endsWith('__'))) {
+        parts.push(
+          <strong key={`bold-${match.index}`} className="font-bold text-white">
+            {fullMatch.slice(2, -2)}
+          </strong>
+        );
+      } else if ((fullMatch.startsWith('*') && fullMatch.endsWith('*')) || (fullMatch.startsWith('_') && fullMatch.endsWith('_'))) {
+        parts.push(
+          <em key={`italic-${match.index}`} className="italic text-gray-200">
+            {fullMatch.slice(1, -1)}
+          </em>
+        );
+      }
+
+      currentIndex = match.index + fullMatch.length;
+    }
+
+    if (currentIndex < text.length) {
+      parts.push(text.substring(currentIndex));
+    }
+
+    return parts;
+  };
+
+  const renderFormattedLines = (lines: string[]): React.ReactNode => {
+    return lines.map((line, i) => {
+      if (line.match(/^#{1,6}\s+/)) {
+        const level = line.match(/^#+/)?.[0].length || 1;
+        const headingText = line.replace(/^#+\s+/, '');
+        const headingClasses = {
+          1: 'text-2xl font-bold text-white mt-6 mb-4 border-b border-gray-600 pb-2',
+          2: 'text-xl font-bold text-white mt-5 mb-3',
+          3: 'text-lg font-semibold text-white mt-4 mb-2',
+          4: 'text-base font-semibold text-gray-200 mt-3 mb-2',
+          5: 'text-sm font-semibold text-gray-300 mt-2 mb-1',
+          6: 'text-xs font-semibold text-gray-400 mt-2 mb-1'
+        };
+        return (
+          <div key={`heading-${i}`} className={headingClasses[level as keyof typeof headingClasses] || headingClasses[3]}>
+            {renderInlineFormatting(headingText)}
+          </div>
+        );
+      } else if (line.match(/^[\s]*[-\*\+]\s+/)) {
+        const indent = (line.match(/^[\s]*/)?.[0].length || 0) / 2;
+        const bulletText = line.replace(/^[\s]*[-\*\+]\s+/, '');
+        return (
+          <div key={`bullet-${i}`} className={`flex items-start gap-2 mb-1 ml-${indent * 4}`}>
+            <span className="text-gray-400 mt-1">•</span>
+            <span className="text-gray-300">{renderInlineFormatting(bulletText)}</span>
+          </div>
+        );
+      } else if (line.match(/^[\s]*\d+\.\s+/)) {
+        const indent = (line.match(/^[\s]*/)?.[0].length || 0) / 2;
+        const numberMatch = line.match(/^[\s]*(\d+)\.\s+/);
+        const number = numberMatch?.[1] || '1';
+        const listText = line.replace(/^[\s]*\d+\.\s+/, '');
+        return (
+          <div key={`number-${i}`} className={`flex items-start gap-2 mb-1 ml-${indent * 4}`}>
+            <span className="text-gray-400 mt-1 font-mono text-sm">{number}.</span>
+            <span className="text-gray-300">{renderInlineFormatting(listText)}</span>
+          </div>
+        );
+      } else if (line.match(/^[-\*_]{3,}$/)) {
+        return <hr key={`hr-${i}`} className="border-gray-700 my-4" />;
+      } else if (line.match(/^>\s+/)) {
+        const quoteText = line.replace(/^>\s+/, '');
+        return (
+          <div key={`quote-${i}`} className="border-l-4 border-gray-500 pl-4 py-1 my-2 bg-gray-800/50 rounded-r">
+            <span className="text-gray-300 italic">{renderInlineFormatting(quoteText)}</span>
+          </div>
+        );
+      } else if (line.trim()) {
+        return (
+          <div key={`line-${i}`} className="mb-1 text-gray-300">
+            {renderInlineFormatting(line)}
+          </div>
+        );
+      } else {
+        return <div key={`empty-${i}`} className="mb-2" />;
+      }
+    });
+  };
+
+  const contentParts = parseContent(content);
+
+  return (
+    <div className="w-full text-base leading-relaxed">
+      {contentParts.map((part) => (
+        <div key={part.key} className="w-full">
+          {part.type === 'codeblock' ? (
+            <CodeBlock code={part.content} language={part.language} />
+          ) : (
+            <div className="whitespace-pre-wrap w-full text-gray-300">
+              {renderFormattedLines(part.content.split('\n'))}
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 
 // Attachment Preview Component
 function AttachmentPreview({ 
@@ -36,7 +261,7 @@ function AttachmentPreview({
       initial={{ opacity: 0, scale: 0.8 }}
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, scale: 0.8 }}
-      className="flex items-center gap-2 bg-gray-700 rounded-lg p-2 border border-gray-600"
+      className="flex items-center gap-2 bg-gray-800 rounded-lg p-2 border border-gray-700"
     >
       <div className="flex items-center gap-2 flex-1 min-w-0">
         {isImage ? (
@@ -231,7 +456,6 @@ export default function ChatComponent({ activeChat, user, setActiveChat, setChat
   const [isSending, setIsSending] = useState(false);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
 
-  // Update selected model when active chat changes
   useEffect(() => {
     if (activeChat?.model) {
       const chatModel = llmModels.find(m => m.id === activeChat.model);
@@ -257,13 +481,10 @@ export default function ChatComponent({ activeChat, user, setActiveChat, setChat
   }, [input]);
 
   const handleModelChange = async (newModel: LLMModel) => {
-    // If no active chat or same model, just update selected model
     if (!activeChat || activeChat.model === newModel.id) {
       setSelectedModel(newModel);
       return;
     }
-
-    // If different model and existing chat, show confirmation
     setPendingModelChange(newModel);
     setShowModelChangeModal(true);
   };
@@ -272,15 +493,10 @@ export default function ChatComponent({ activeChat, user, setActiveChat, setChat
     if (!pendingModelChange || !activeChat || !user?.email) return;
 
     try {
-      // Update chat model in database
       const updateResult = await updateChatModelAction(activeChat._id, pendingModelChange.id, user);
-      
       if (updateResult.success) {
-        // Update local state
         const updatedChat = { ...activeChat, model: pendingModelChange.id };
         setActiveChat(updatedChat);
-        
-        // Update chat list
         setChatList(prev => 
           prev.map(chat => 
             chat._id === activeChat._id 
@@ -288,16 +504,13 @@ export default function ChatComponent({ activeChat, user, setActiveChat, setChat
               : chat
           )
         );
-        
         setSelectedModel(pendingModelChange);
       } else {
         console.error('Failed to update chat model:', updateResult.error);
-        // Optionally show error message to user
       }
     } catch (error) {
       console.error('Error updating chat model:', error);
     }
-
     setShowModelChangeModal(false);
     setPendingModelChange(null);
   };
@@ -315,7 +528,7 @@ export default function ChatComponent({ activeChat, user, setActiveChat, setChat
     setAttachments(prev => [
       ...prev,
       {
-        id: Date.now() + Math.random(), // More unique ID
+        id: Date.now() + Math.random(),
         fileData,
         fileType,
         fileName
@@ -331,141 +544,142 @@ export default function ChatComponent({ activeChat, user, setActiveChat, setChat
     const messageAttachments = [...attachments];
     
     setInput('');
-    setAttachments([]); // Clear attachments after sending
+    setAttachments([]);
     setIsSending(true);
 
-    const id = Date.now()
-
-    const userMessage: Message = { id: id, content: messageInput, role: 'user'};
-
-    if (messageAttachments.length > 0){
-    const updatedAttachments = messageAttachments.map(att => ({ ...att, id: id }));
-    setAttachments(updatedAttachments);}
+    const messageId = Date.now();
+    const userMessage: Message = { id: messageId, content: messageInput, role: 'user'};
+    const currentAttachmentsWithMsgId = messageAttachments.map(att => ({ ...att, id: messageId }));
 
     let chatToUpdate = activeChat;
+
     if (activeChat) {
-      chatToUpdate = { ...activeChat, chatHistory: [...activeChat.chatHistory, userMessage], attachments: [...activeChat.attachments, ...messageAttachments] };
+      chatToUpdate = { 
+        ...activeChat, 
+        chatHistory: [...activeChat.chatHistory, userMessage], 
+        attachments: [...activeChat.attachments, ...currentAttachmentsWithMsgId] 
+      };
       setActiveChat(chatToUpdate);
     } else {
-      
       const idResp = await newObjectIdAction();
       const titleResp = await generateTitleAction(selectedModel.id, userMessage);
-      console.log(idResp.success, titleResp.success)
       if (idResp.success && idResp.data && titleResp.success && titleResp.data) {
-        const id = JSON.parse(idResp.data);
+        const newChatId = JSON.parse(idResp.data);
         const title = titleResp.data;
         chatToUpdate = {
-          _id: id,
+          _id: newChatId,
           title: title,
           chatHistory: [userMessage],
           model: selectedModel.id,
-          attachments: messageAttachments
+          attachments: currentAttachmentsWithMsgId
         };
         setActiveChat(chatToUpdate);
-      } else throw new Error( idResp.error ? idResp.error :"No id error, " + titleResp.error ? idResp.error : "No title error.");
+      } else {
+        throw new Error(idResp.error || titleResp.error || "Failed to create new chat.");
+      }
     }
 
-    // Call the Server Action
+    const aiMessagePlaceholder: Message = { id: Date.now() + 1, content: '', role: 'model', isStreaming: true };
+    let updatedChatHistory = [...chatToUpdate!.chatHistory, aiMessagePlaceholder];
+    setActiveChat({ ...chatToUpdate!, chatHistory: updatedChatHistory });
+
     const result = await sendMessageToAIAction(selectedModel.id, chatToUpdate, user);
-
-    const aiMessagePlaceholder: Message = {
-      id: Date.now() + 1,
-      content: '',
-      role: 'model',
-      isStreaming: true,
-    };
-    chatToUpdate = {
-      ...chatToUpdate!,
-      chatHistory: [...chatToUpdate!.chatHistory, aiMessagePlaceholder],
-    };
-    setActiveChat(chatToUpdate);
     let fullResponse = '';
+    let imgResponse = "";
 
-    if (result.success && result.data) {
-      let lastContent = '';
-      let lastStreaming = true;
-      for await (const delta of readStreamableValue(result.data.stream)) {
-        fullResponse += delta;
-        lastContent = fullResponse;
-        // Update the AI message in chatHistory
+    try {
+      if (result.success && result.data) {
+        for await (const delta of readStreamableValue(result.data.stream)) {
+          fullResponse += delta;
+          setActiveChat(prev => {
+            if (!prev) return prev;
+            const updatedHistory = [...prev.chatHistory];
+            updatedHistory[updatedHistory.length - 1] = { 
+              ...updatedHistory[updatedHistory.length - 1], 
+              content: fullResponse, 
+              isStreaming: true 
+            };
+            return { ...prev, chatHistory: updatedHistory };
+          });
+        }
+
+        if (result.data.img) {
+          for await (const delta of readStreamableValue(result.data.img)) {
+            imgResponse += delta;
+          }
+        }
+
         setActiveChat(prev => {
           if (!prev) return prev;
-          const updatedHistory = prev.chatHistory.map((msg, idx) =>
-            idx === prev.chatHistory.length - 1
-              ? { ...msg, content: lastContent, isStreaming: lastStreaming }
-              : msg
-          );
+          const updatedHistory = [...prev.chatHistory];
+          updatedHistory[updatedHistory.length - 1] = { 
+            ...updatedHistory[updatedHistory.length - 1], 
+            content: fullResponse, 
+            isStreaming: false 
+          };
           return { ...prev, chatHistory: updatedHistory };
         });
-      }
-      // Finalize the AI message state
-      lastStreaming = false;
-      setActiveChat(prev => {
-        if (!prev) return prev;
-        const updatedHistory = prev.chatHistory.map((msg, idx) =>
-          idx === prev.chatHistory.length - 1
-            ? { ...msg, content: lastContent, isStreaming: lastStreaming }
-            : msg
-        );
-        return { ...prev, chatHistory: updatedHistory };
-      });
-      chatToUpdate.chatHistory[chatToUpdate.chatHistory.length-1].content = fullResponse
-      chatToUpdate.chatHistory[chatToUpdate.chatHistory.length-1].isStreaming = false
 
-      let imgResponse = "";
-
-      if (result.data.img) {
-        for await (const delta of readStreamableValue(result.data.img)) {
-          imgResponse += delta;
-        }
         if (imgResponse) {
-          // Add AI image message after streaming is complete
           const aiImageMessage: Message = {
             id: Date.now() + 2,
             content: `data:image/png;base64,${imgResponse}`,
             role: 'model',
             isStreaming: false,
           };
-          chatToUpdate = {
-            ...chatToUpdate!,
-            chatHistory: [...chatToUpdate!.chatHistory, aiImageMessage],
-          };
-          setActiveChat(chatToUpdate);
+          setActiveChat(prev => {
+            if (!prev) return prev;
+            return { ...prev, chatHistory: [...prev.chatHistory, aiImageMessage] };
+          });
+          chatToUpdate!.chatHistory.push(aiImageMessage);
         }
+      } else {
+        const errorMessage: Message = { id: Date.now() + 1, content: `Error: ${result.error}`, role: 'model', isStreaming: false };
+        setActiveChat(prev => {
+          if (!prev) return prev;
+          const updatedHistory = [...prev.chatHistory];
+          updatedHistory[updatedHistory.length - 1] = errorMessage; 
+          return { ...prev, chatHistory: updatedHistory };
+        });
+        chatToUpdate!.chatHistory.push(errorMessage); 
       }
-    } else {
-      // Handle error: show an error message in the chat
+    } catch (streamError) {
+        console.error("Error during streaming:", streamError);
+        const errorMessage: Message = { id: Date.now() + 1, content: 'An error occurred while processing the stream.', role: 'model', isStreaming: false };
+        setActiveChat(prev => {
+            if (!prev) return prev;
+            const updatedHistory = [...prev.chatHistory];
+            updatedHistory[updatedHistory.length - 1] = errorMessage;
+            return { ...prev, chatHistory: updatedHistory };
+          });
+        chatToUpdate!.chatHistory.push(errorMessage);
+    }
 
-      chatToUpdate.chatHistory.pop(); //remove old placeeholder
-      setActiveChat(chatToUpdate)// update both
+    if (chatToUpdate) {
+        const finalChatHistory = [...(await activeChat?.chatHistory ?? [])];
+        finalChatHistory.pop(); 
+        finalChatHistory.push(...updatedChatHistory.slice(updatedChatHistory.length - (imgResponse ? 2 : 1)));
+        
+        chatToUpdate.chatHistory = finalChatHistory;
 
-
-      const errorMessage: Message = { id: Date.now() + 1, content: `Error: ${result.error}`, role: 'model', isStreaming: false };
-      setActiveChat(prev => {
-        if (!prev) return prev;
-        return { ...prev, chatHistory: [...prev.chatHistory, errorMessage] };
-      });
-      
-      chatToUpdate.chatHistory.push(errorMessage);
-    } 
-
-    const saveResp = await saveChatToDbAction(chatToUpdate, user);
-    if (!saveResp.success) throw new Error("Could not save chat to DB!" + saveResp.error);
-
-    setChatList(
-      prev => {
-        const existingIndex = prev.findIndex(chat => chat._id === chatToUpdate._id);
-        if (existingIndex !== -1) {
-          // Update existing chat
-          const updatedChats = [...prev];
-          updatedChats[existingIndex] = chatToUpdate;
-          return updatedChats;
+        const saveResp = await saveChatToDbAction(chatToUpdate, user);
+        if (!saveResp.success) {
+            console.error("Could not save chat to DB!", saveResp.error);
         } else {
-          // Add new chat
-          return [...prev, chatToUpdate];
+            setChatList(
+                prev => {
+                    const existingIndex = prev.findIndex(chat => chat._id === chatToUpdate._id);
+                    if (existingIndex !== -1) {
+                        const updatedChats = [...prev];
+                        updatedChats[existingIndex] = chatToUpdate;
+                        return updatedChats;
+                    } else {
+                        return [...prev, chatToUpdate];
+                    }
+                }
+            );
         }
-      }
-    )
+    }
 
     setIsSending(false);
   };
@@ -477,24 +691,20 @@ export default function ChatComponent({ activeChat, user, setActiveChat, setChat
     }
   };
 
-
-
-  if (!activeChat) {//show new chat screen
+  // Render the "New Chat" welcome screen if no active chat
+  if (!activeChat) {
     return (
         <div className="flex flex-col h-full bg-gray-900">
-          {/* Header */}
           <header className="flex items-center justify-between p-4 border-b border-gray-700">
-            <h1 className="text-xl font-bold">Multi AI Chat</h1>
+            <h1 className="text-xl font-bold text-white">Multi AI Chat</h1>
             <ModelDropdown 
               selectedModel={selectedModel} 
               onModelSelect={handleModelChange} 
             />
           </header>
             <WelcomeScreen />
-            {/* Input Footer */}
             <footer className="p-4">
               <div className="max-w-3xl mx-auto">
-                {/* Attachments Preview */}
                 <AnimatePresence>
                   {attachments.length > 0 && (
                     <motion.div
@@ -516,7 +726,6 @@ export default function ChatComponent({ activeChat, user, setActiveChat, setChat
                   )}
                 </AnimatePresence>
 
-                {/* Input Container */}
                 <div className="relative rounded-2xl bg-white/5 backdrop-blur-sm border border-white/10 shadow-lg p-2">
                   <textarea
                     ref={textareaRef}
@@ -556,59 +765,60 @@ export default function ChatComponent({ activeChat, user, setActiveChat, setChat
     );
   }
 
+  // Render the main chat interface
   return (
-    <div className="flex flex-col h-full bg-gray-900 font-sans">
-      {/* Header */}
+    <div className="flex flex-col h-full bg-gray-900 font-sans overflow-hidden"> {/* Added overflow-hidden to main container */}
       <header className="flex items-center justify-between p-4 border-b border-gray-700">
-        <h1 className="text-xl font-bold">{activeChat.title}</h1>
+        <h1 className="text-xl font-bold text-white">{activeChat.title}</h1>
         <ModelDropdown 
           selectedModel={selectedModel} 
           onModelSelect={handleModelChange} 
         />
       </header>
 
-      {/* Chat Messages */}
-      <main className="flex-1 overflow-y-auto p-6 space-y-8">
+      <main 
+        ref={messagesEndRef} // Attach ref here for scrolling
+        className="flex-1 overflow-y-auto p-6 space-y-8 scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-gray-800" // Scrollbar styling
+      >
         {activeChat.chatHistory.map((msg, index) => (
           <div key={msg.id} className={`flex items-start gap-4 ${msg.role === 'user' ? 'justify-end' : ''}`}>
-            {msg.role === 'ai' && (
+            {msg.role === 'model' && (
               <div className="w-10 h-10 flex-shrink-0 flex items-center justify-center bg-gradient-to-br from-purple-500 to-blue-500 rounded-full">
-          <Building2 className="w-6 h-6 text-white" />
+                <Building2 className="w-6 h-6 text-white" />
               </div>
             )}
-            <div className={`max-w-xl p-4 rounded-xl ${
+            {/* Increased max-width for message bubbles */}
+            <div className={`max-w-[75%] p-4 rounded-xl ${
               msg.role === 'user'
-          ? 'bg-blue-600 rounded-br-none'
-          : 'bg-gray-700 rounded-bl-none'
+                ? 'bg-blue-600 rounded-br-none' // User message bubble
+                : 'bg-gray-700 rounded-bl-none' // AI message bubble
             }`}>
               {/^data:image\/[a-zA-Z]+;base64,/.test(msg.content) ? (
-          <img
-            src={msg.content}
-            alt="attachment"
-            className="max-w-xs max-h-64 rounded-lg border border-gray-600"
-          />
+                <img
+                  src={msg.content}
+                  alt="attachment"
+                  className="max-w-xs max-h-64 rounded-lg border border-gray-700"
+                />
               ) : (
-          <p className="whitespace-pre-wrap">
-            {msg.content}
-            {/* Streaming Indicator */}
-            {msg.isStreaming && <span className="inline-block w-2 h-4 bg-white ml-2 animate-pulse rounded-full" />}
-          </p>
+                <div>
+                  <MessageContent content={msg.content} />
+                  {msg.isStreaming && <span className="inline-block w-2 h-4 bg-white ml-2 animate-pulse rounded-full" />}
+                </div>
               )}
             </div>
             {msg.role === 'user' && (
-              <div className="w-10 h-10 flex-shrink-0 flex items-center justify-center bg-gray-600 rounded-full">
-          <User className="w-6 h-6 text-gray-300" />
+              <div className="w-10 h-10 flex-shrink-0 flex items-center justify-center bg-gray-700 rounded-full">
+                <User className="w-6 h-6 text-gray-300" />
               </div>
             )}
           </div>
         ))}
-        <div ref={messagesEndRef} />
+        {/* This div is no longer needed here for scrolling, ref is attached to main */}
+        {/* <div ref={messagesEndRef} /> */} 
       </main>
 
-      {/* Message Input Area */}
       <footer className="p-4">
         <div className="max-w-3xl mx-auto">
-          {/* Attachments Preview */}
           <AnimatePresence>
             {attachments.length > 0 && (
               <motion.div
@@ -630,7 +840,6 @@ export default function ChatComponent({ activeChat, user, setActiveChat, setChat
             )}
           </AnimatePresence>
 
-          {/* Input Container */}
           <div className="relative rounded-2xl bg-white/5 backdrop-blur-sm border border-white/10 shadow-lg p-2">
             <textarea
               ref={textareaRef}
@@ -667,7 +876,6 @@ export default function ChatComponent({ activeChat, user, setActiveChat, setChat
         </div>
       </footer>
 
-      {/* Model Change Confirmation Modal */}
       <ModelChangeModal
         isOpen={showModelChangeModal}
         onConfirm={confirmModelChange}
