@@ -140,7 +140,7 @@ export async function updateChatModel(chatId: string, newModel: string, user:{na
 export async function sendMessageToGemeni(selectedModel: string, chat: Chat) {
   const chatHistory = chat.chatHistory;
   const streamable = createStreamableValue("");
-
+  try{
   // Efficiently partition attachments into those matching the last message and the rest
   const lastMessage = chat.chatHistory[chat.chatHistory.length - 1];
   const attachments = chat.attachments || [];
@@ -166,7 +166,7 @@ export async function sendMessageToGemeni(selectedModel: string, chat: Chat) {
     [[], []]
   );
   const allInlineData = [...inlineData, ...previousInlineData];
-  (async () => {
+  
     try{
       const ai = new GoogleGenAI({ apiKey: process.env.GOOGLE_API_KEY as string });
       const response = await ai.models.generateContentStream({
@@ -174,21 +174,23 @@ export async function sendMessageToGemeni(selectedModel: string, chat: Chat) {
       contents: "This is the context of user and ai assistant conversation."+ JSON.stringify(chatHistory) +" the first "+inlineData.length+" inline data elements are new attachments from the most recent message, the other "+previousInlineData.length+" are previous attachments." + 
     "(when the user is referencing the attachments in the prompt of the most recent message, they are likely to refering to the new set of attachments, if there are no attachments in the first set and the user tries to reference new attachments remind the user that they did not attach new data," +
     "for example, user asks what is this? when there are no new attachments.)"+" Continue the conversation with the user by answering the most recent message, user may refer to older attachments so carefully read context to understand "+
-    "what the user is refering to. (You are a image model so make sure you output images if user asks and cross context from previous prompts unless the user specifically says so)"
+    "what the user is refering to."
     });
       for await (const chunk of response){
         const text = chunk.text as string;
         streamable.update(text);
       }
-
-
     }catch(error){
-      console.error('Error receiving message from Gemini:', error);
       throw new Error(error instanceof Error ? error.message : String(error));
-    } finally{
-      streamable.done()
     }
-  })();
+      
+  
+  }catch(error){
+      //console.error('Error receiving message from Gemini:', error);
+      throw new Error(error instanceof Error ? error.message : String(error));
+  } finally{
+      streamable.done()
+  }
 
   return {stream: streamable.value, img: null};
 }

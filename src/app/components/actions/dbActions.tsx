@@ -19,20 +19,25 @@ export async function generateTitleAction( selectedModel: string, userMessage: M
   }
 }
 
-export async function sendMessageToAIAction( selectedModel: string, chat: Chat, user:{name?: string | null, email?: string | null}){
-
-  try{ 
+export async function sendMessageToAIAction(selectedModel: string, chat: Chat, user: { name?: string | null, email?: string | null }) {
+  try {
     let modelResponse;
     if (selectedModel.includes('gemini')) {
-      if (selectedModel.includes('image')) modelResponse = await sendMessageToGemeniImage(selectedModel, chat);
-      else modelResponse = await sendMessageToGemeni(selectedModel, chat);
+      if (selectedModel.includes('image')) {
+        modelResponse = await sendMessageToGemeniImage(selectedModel, chat);
+      } else {
+        modelResponse = await sendMessageToGemeni(selectedModel, chat);
+      }
+    } else if (selectedModel.includes('llama')) {
+      modelResponse = await sendMessageToGemeni(selectedModel, chat);
+    } else if (selectedModel.includes('deepseek')) {
+      modelResponse = await sendMessageToGemeni(selectedModel, chat);
+    } else {
+      throw new Error('Unsupported model selected');
     }
-    if (selectedModel.includes('llama')) modelResponse = await sendMessageToGemeni(selectedModel, chat);
-    if (selectedModel.includes('deepseek')) modelResponse = await sendMessageToGemeni(selectedModel, chat);
     
-
-    return { success: true, data: modelResponse}
-  }catch(error){
+    return { success: true, data: modelResponse };
+  } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : String(error) };
   }
 }

@@ -1,16 +1,16 @@
 'use client';
 import React from 'react'
 import { useState, useRef, useEffect } from 'react';
-import { Building2, User, CornerDownLeft, Paperclip, AlertTriangle, X, FileText, Image, CheckCircle, Loader2, Copy, Check } from 'lucide-react';
+import { Building2, User, CornerDownLeft, Paperclip, AlertTriangle, X, FileText, Image, CheckCircle, Loader2, Copy, Check, Menu } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { newObjectIdAction, sendMessageToAIAction, generateTitleAction, saveChatToDbAction, updateChatModelAction } from '../actions/dbActions'
 import { readStreamableValue } from 'ai/rsc'
 import ModelDropdown, { llmModels } from './ModelDropdown';
-import { ChatProps, Attachment, Message, LLMModel } from "../../types/types"
+import { ChatProps, Attachment, Message, LLMModel, Chat} from "../../types/types"
 
 function WelcomeScreen() {
     return (
-        <div className="flex-1 flex flex-col items-center justify-center text-center">
+        <div className="flex-1 flex flex-col items-center justify-center text-center px-4">
             <div className="p-4 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 mb-4">
                 <Building2 className="w-12 h-12 text-white" />
             </div>
@@ -587,7 +587,6 @@ export default function ChatComponent({ activeChat, user, setActiveChat, setChat
   const handleSend = async () => {
     if (input.trim() === '' || isSending) return;
     if (!user?.email) throw new Error('Something went wrong, user not authenticated');
-    
     const messageInput = input;
     const messageAttachments = [...attachments];
     
@@ -625,7 +624,7 @@ export default function ChatComponent({ activeChat, user, setActiveChat, setChat
         setActiveChat(chatToUpdate);
       } else throw new Error( idResp.error ? idResp.error :"No id error, " + titleResp.error ? idResp.error : "No title error.");
     }
-
+    
     // Add AI placeholder message
     const aiMessagePlaceholder: Message = {
       id: Date.now() + 1,
@@ -638,9 +637,11 @@ export default function ChatComponent({ activeChat, user, setActiveChat, setChat
       chatHistory: [...chatToUpdate!.chatHistory, aiMessagePlaceholder],
     };
     setActiveChat(chatToUpdate);
-
     // Call the Server Action
     const result = await sendMessageToAIAction(selectedModel.id, chatToUpdate, user);
+
+    
+    
     let fullResponse = '';
 
     if (result.success && result.data) {
@@ -698,17 +699,25 @@ export default function ChatComponent({ activeChat, user, setActiveChat, setChat
     } else {
       // Handle error: show an error message in the chat
 
-      chatToUpdate.chatHistory.pop(); //remove old placeeholder
+      chatToUpdate.chatHistory.pop(); //remove old placeholder
       setActiveChat(chatToUpdate)// update both
 
 
-      const errorMessage: Message = { id: Date.now() + 1, content: `Error: ${result.error}`, role: 'model', isStreaming: false };
-      setActiveChat(prev => {
-        if (!prev) return prev;
-        return { ...prev, chatHistory: [...prev.chatHistory, errorMessage] };
-      });
+      const errorMessage: Message = { id: Date.now() + 1, content: `Youve probably reached token limit by having too much context or images in this chat try starting a new chat.\nError: ${result.error}`, role: 'model', isStreaming: false };
       
+      setActiveChat(prev => {
+        if (!prev) return ({
+          _id: 'error-chat',
+          title: 'Error Chat',
+          model: selectedModel.id,
+          chatHistory: [errorMessage],
+          attachments: [],
+        });
+        return { ...prev, chatHistory: [...prev.chatHistory, errorMessage] };
+       
+      }); 
       chatToUpdate.chatHistory.push(errorMessage);
+      
     } 
 
     const saveResp = await saveChatToDbAction(chatToUpdate, user);
