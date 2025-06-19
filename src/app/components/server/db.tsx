@@ -140,59 +140,58 @@ export async function updateChatModel(chatId: string, newModel: string, user:{na
 export async function sendMessageToGemeni(selectedModel: string, chat: Chat) {
   const chatHistory = chat.chatHistory;
   const streamable = createStreamableValue("");
-  try{
-  // Efficiently partition attachments into those matching the last message and the rest
-  const lastMessage = chat.chatHistory[chat.chatHistory.length - 1];
-  const attachments = chat.attachments || [];
-  const [inlineData, previousInlineData] = attachments.reduce<[any[], any[]]>(
-    ([match, rest], att) => {
-      if (lastMessage && att.id === lastMessage.id) {
-        match.push({
-          inlineData: {
-            mimeType: att.fileType,
-            data: att.fileData,
-          },
-        });
-      } else {
-        rest.push({
-          inlineData: {
-            mimeType: att.fileType,
-            data: att.fileData,
-          },
-        });
-      }
-      return [match, rest];
-    },
-    [[], []]
-  );
-  const allInlineData = [...inlineData, ...previousInlineData];
-  
-    try{
-      const ai = new GoogleGenAI({ apiKey: process.env.GOOGLE_API_KEY as string });
-      const response = await ai.models.generateContentStream({
-      model: selectedModel,
-      contents: "This is the context of user and ai assistant conversation."+ JSON.stringify(chatHistory) +" the first "+inlineData.length+" inline data elements are new attachments from the most recent message, the other "+previousInlineData.length+" are previous attachments." + 
-    "(when the user is referencing the attachments in the prompt of the most recent message, they are likely to refering to the new set of attachments, if there are no attachments in the first set and the user tries to reference new attachments remind the user that they did not attach new data," +
-    "for example, user asks what is this? when there are no new attachments.)"+" Continue the conversation with the user by answering the most recent message, user may refer to older attachments so carefully read context to understand "+
-    "what the user is refering to."
-    });
-      for await (const chunk of response){
-        const text = chunk.text as string;
-        streamable.update(text);
-      }
-    }catch(error){
-      throw new Error(error instanceof Error ? error.message : String(error));
-    }
-      
-  
-  }catch(error){
-      //console.error('Error receiving message from Gemini:', error);
-      throw new Error(error instanceof Error ? error.message : String(error));
-  } finally{
-      streamable.done()
-  }
+    // Efficiently partition attachments into those matching the last message and the rest
+    const lastMessage = chat.chatHistory[chat.chatHistory.length - 1];
+    const attachments = chat.attachments || [];
+    const [inlineData, previousInlineData] = attachments.reduce<[any[], any[]]>(
+      ([match, rest], att) => {
+        if (lastMessage && att.id === lastMessage.id) {
+          match.push({
+            inlineData: {
+              mimeType: att.fileType,
+              data: att.fileData,
+            },
+          });
+        } else {
+          rest.push({
+            inlineData: {
+              mimeType: att.fileType,
+              data: att.fileData,
+            },
+          });
+        }
+        return [match, rest];
+      },
+      [[], []]
+    );
 
-  return {stream: streamable.value, img: null};
+    // Start the streaming process immediately without awaiting
+    (async () => {
+      try {
+        const ai = new GoogleGenAI({ apiKey: process.env.GOOGLE_API_KEY as string });
+        const response = await ai.models.generateContentStream({
+          model: selectedModel,
+          contents: "This is the context of user and ai assistant conversation." + JSON.stringify(chatHistory) + " the first " + inlineData.length + " inline data elements are new attachments from the most recent message, the other " + previousInlineData.length + " are previous attachments." +
+            "(when the user is referencing the attachments in the prompt of the most recent message, they are likely to refering to the new set of attachments, if there are no attachments in the first set and the user tries to reference new attachments remind the user that they did not attach new data," +
+            "for example, user asks what is this? when there are no new attachments.)" + " Continue the conversation with the user by answering the most recent message, user may refer to older attachments so carefully read context to understand " +
+            "what the user is refering to."
+        });
+        
+        for await (const chunk of response) {
+          const text = chunk.text as string;
+          streamable.update(text);
+        }
+      } catch (error) {
+        // Send error through the stream
+        streamable.error(error instanceof Error ? error.message : String(error));
+        return;
+      }
+        streamable.done();
+    })();
+
+    // Return immediately with the stream
+    return { stream: streamable.value, img: null }; 
+  
 }
 
 export async function sendMessageToGemeniImage(selectedModel: string, chat: Chat) {
@@ -200,80 +199,88 @@ export async function sendMessageToGemeniImage(selectedModel: string, chat: Chat
   const streamable = createStreamableValue("");
   const streamableIMG = createStreamableValue("");
   
-  const lastMessage = chat.chatHistory[chat.chatHistory.length - 1];
-  const attachments = chat.attachments || [];
-  const [inlineData, previousInlineData] = attachments.reduce<[any[], any[]]>(
-    ([match, rest], att) => {
-      if (lastMessage && att.id === lastMessage.id) {
-        match.push({
-          inlineData: {
-            mimeType: att.fileType,
-            data: att.fileData,
-          },
-        });
-      } else {
-        rest.push({
-          inlineData: {
-            mimeType: att.fileType,
-            data: att.fileData,
-          },
-        });
-      }
-      return [match, rest];
-    },
-    [[], []]
-  );
-  const allInlineData = [...inlineData, ...previousInlineData];
- 
-  // Await the AI response and stream updates before returning the result
-  await (async () => {
-    try{
-      const ai = new GoogleGenAI({ apiKey: process.env.GOOGLE_API_KEY as string });
-      const response = await ai.models.generateContent({
-      model: selectedModel,
-      contents: createUserContent([
-    "This is the context of user and ai assistant conversation."+ JSON.stringify(chatHistory) +" the first "+inlineData.length+" inline data elements are new attachments from the most recent message, the other "+previousInlineData.length+" are previous attachments." + 
-    "(when the user is referencing the attachments in the prompt of the most recent message, they are likely to refering to the new set of attachments, if there are no attachments in the first set and the user tries to reference new attachments remind the user that they did not attach new data," +
-    "for example, user asks what is this? when there are no new attachments.)"+
-    " Continue the conversation with the user by answering the most recent message, user may refer to older attachments so carefully read context to understand what the user is refering to. (You are a image model so make sure you output images if user asks and cross context from previous prompts unless the user specifically says so)",
-      ...allInlineData]),
-      config: {
-      responseModalities: [Modality.TEXT, Modality.IMAGE],
-    },
-    });
-      if (
-        response.candidates &&
-        response.candidates[0] &&
-        response.candidates[0].content &&
-        Array.isArray(response.candidates[0].content.parts)
-      ) {
-        for (const part of response.candidates[0].content.parts) {
-          // Based on the part type, either show the text or save the image
-          if (part.text) {
-            streamable.update(part.text);
-          } else if (part.inlineData && part.inlineData.data) {
-
-            const buffer = Buffer.from(part.inlineData.data, "base64");
-      
-            
-            streamableIMG.update(part.inlineData.data);
-          }
+  try {
+    const lastMessage = chat.chatHistory[chat.chatHistory.length - 1];
+    const attachments = chat.attachments || [];
+    const [inlineData, previousInlineData] = attachments.reduce<[any[], any[]]>(
+      ([match, rest], att) => {
+        if (lastMessage && att.id === lastMessage.id) {
+          match.push({
+            inlineData: {
+              mimeType: att.fileType,
+              data: att.fileData,
+            },
+          });
+        } else {
+          rest.push({
+            inlineData: {
+              mimeType: att.fileType,
+              data: att.fileData,
+            },
+          });
         }
-      } else {
-        console.warn('No valid candidates or parts found in Gemini response.');
+        return [match, rest];
+      },
+      [[], []]
+    );
+    const allInlineData = [...inlineData, ...previousInlineData];
+
+    // Start the async process without awaiting
+    (async () => {
+      try {
+        const ai = new GoogleGenAI({ apiKey: process.env.GOOGLE_API_KEY as string });
+        const response = await ai.models.generateContent({
+          model: selectedModel,
+          contents: createUserContent([
+            "This is the context of user and ai assistant conversation." + JSON.stringify(chatHistory) + " the first " + inlineData.length + " inline data elements are new attachments from the most recent message, the other " + previousInlineData.length + " are previous attachments." +
+            "(when the user is referencing the attachments in the prompt of the most recent message, they are likely to refering to the new set of attachments, if there are no attachments in the first set and the user tries to reference new attachments remind the user that they did not attach new data," +
+            "for example, user asks what is this? when there are no new attachments.)" +
+            " Continue the conversation with the user by answering the most recent message, user may refer to older attachments so carefully read context to understand what the user is refering to. (You are a image model so make sure you output images if user asks and cross context from previous prompts unless the user specifically says so)",
+            ...allInlineData
+          ]),
+          config: {
+            responseModalities: [Modality.TEXT, Modality.IMAGE],
+          },
+        });
+
+        if (
+          response.candidates &&
+          response.candidates[0] &&
+          response.candidates[0].content &&
+          Array.isArray(response.candidates[0].content.parts)
+        ) {
+          for (const part of response.candidates[0].content.parts) {
+            if (part.text) {
+              streamable.update(part.text);
+            } else if (part.inlineData && part.inlineData.data) {
+              const buffer = Buffer.from(part.inlineData.data, "base64");
+              streamableIMG.update(part.inlineData.data);
+            }
+          }
+        } else {
+          console.warn('No valid candidates or parts found in Gemini response.');
+        }
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        streamable.error(errorMessage);
+        streamableIMG.error(errorMessage);
+        return;
+      } finally {
+        streamableIMG.done();
+        streamable.done();
       }
+    })();
 
-
-    }catch(error){
-      console.error('Error receiving message from Gemini:', error);
-      throw new Error(error instanceof Error ? error.message : String(error));
-    } finally{
-      streamableIMG.done()
-      streamable.done()
-    }
-  })();
-  
-  return {stream: streamable.value, img: streamableIMG.value};
+    // Return immediately with the streams
+    return { stream: streamable.value, img: streamableIMG.value };
+    
+  } catch (error) {
+    // Handle synchronous errors
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    streamable.error(errorMessage);
+    streamableIMG.error(errorMessage);
+    return { stream: streamable.value, img: streamableIMG.value };
+  }
 }
 
 export async function verifyPass(credentials: { email?: string, password?: string }) {

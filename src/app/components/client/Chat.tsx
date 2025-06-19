@@ -35,7 +35,7 @@ function CodeBlock({ code, language }: { code: string; language?: string }) {
   };
 
   return (
-    <div className="relative group my-4 w-full">
+    <div className=" group my-4 w-full">
       <div className="flex items-center justify-between bg-gray-800 px-4 py-2 rounded-t-lg border-b border-gray-600">
         <span className="text-sm text-gray-400 font-mono">
           {language || 'code'}
@@ -587,70 +587,83 @@ export default function ChatComponent({ activeChat, user, setActiveChat, setChat
   const handleSend = async () => {
     if (input.trim() === '' || isSending) return;
     if (!user?.email) throw new Error('Something went wrong, user not authenticated');
-    const messageInput = input;
-    const messageAttachments = [...attachments];
-    
-    setInput('');
-    setAttachments([]); // Clear attachments after sending
-    setIsSending(true);
-
-    const id = Date.now()
-
-    const userMessage: Message = { id: id, content: messageInput, role: 'user'};
-
-    if (messageAttachments.length > 0){
-    const updatedAttachments = messageAttachments.map(att => ({ ...att, id: id }));
-    setAttachments(updatedAttachments);}
-
-    let chatToUpdate = activeChat;
-    if (activeChat) {
-      chatToUpdate = { ...activeChat, chatHistory: [...activeChat.chatHistory, userMessage], attachments: [...activeChat.attachments, ...messageAttachments] };
-      setActiveChat(chatToUpdate);
-    } else {
+    try {
+      const messageInput = input;
+      const messageAttachments = [...attachments];
       
-      const idResp = await newObjectIdAction();
-      const titleResp = await generateTitleAction(selectedModel.id, userMessage);
-      console.log(idResp.success, titleResp.success)
-      if (idResp.success && idResp.data && titleResp.success && titleResp.data) {
-        const id = JSON.parse(idResp.data);
-        const title = titleResp.data;
-        chatToUpdate = {
-          _id: id,
-          title: title,
-          chatHistory: [userMessage],
-          model: selectedModel.id,
-          attachments: messageAttachments
-        };
+      setInput('');
+      setAttachments([]); // Clear attachments after sending
+      setIsSending(true);
+
+      const id = Date.now()
+
+      const userMessage: Message = { id: id, content: messageInput, role: 'user'};
+
+      if (messageAttachments.length > 0){
+      const updatedAttachments = messageAttachments.map(att => ({ ...att, id: id }));
+      setAttachments(updatedAttachments);}
+
+      let chatToUpdate = activeChat;
+      if (activeChat) {
+        chatToUpdate = { ...activeChat, chatHistory: [...activeChat.chatHistory, userMessage], attachments: [...activeChat.attachments, ...messageAttachments] };
         setActiveChat(chatToUpdate);
-      } else throw new Error( idResp.error ? idResp.error :"No id error, " + titleResp.error ? idResp.error : "No title error.");
-    }
-    
-    // Add AI placeholder message
-    const aiMessagePlaceholder: Message = {
-      id: Date.now() + 1,
-      content: '',
-      role: 'model',
-      isStreaming: true,
-    };
-    chatToUpdate = {
-      ...chatToUpdate!,
-      chatHistory: [...chatToUpdate!.chatHistory, aiMessagePlaceholder],
-    };
-    setActiveChat(chatToUpdate);
-    // Call the Server Action
-    const result = await sendMessageToAIAction(selectedModel.id, chatToUpdate, user);
+      } else {
+        
+        const idResp = await newObjectIdAction();
+        const titleResp = await generateTitleAction(selectedModel.id, userMessage);
+        console.log(idResp.success, titleResp.success)
+        if (idResp.success && idResp.data && titleResp.success && titleResp.data) {
+          const id = JSON.parse(idResp.data);
+          const title = titleResp.data;
+          chatToUpdate = {
+            _id: id,
+            title: title,
+            chatHistory: [userMessage],
+            model: selectedModel.id,
+            attachments: messageAttachments
+          };
+          setActiveChat(chatToUpdate);
+        } else throw new Error( idResp.error ? idResp.error :"No id error, " + titleResp.error ? idResp.error : "No title error.");
+      }
+      
+      
+      // Call the Server Action
+      const result = await sendMessageToAIAction(selectedModel.id, chatToUpdate, user);
 
-    
-    
-    let fullResponse = '';
+      // Add AI placeholder message
+      const aiMessagePlaceholder: Message = {
+        id: Date.now() + 1,
+        content: '',
+        role: 'model',
+        isStreaming: true,
+      };
+      chatToUpdate = {
+        ...chatToUpdate!,
+        chatHistory: [...chatToUpdate!.chatHistory, aiMessagePlaceholder],
+      };
+      setActiveChat(chatToUpdate);
+      
+      let fullResponse = '';
 
-    if (result.success && result.data) {
-      let lastContent = '';
-      let lastStreaming = true;
-      for await (const delta of readStreamableValue(result.data.stream)) {
-        fullResponse += delta;
-        lastContent = fullResponse;
-        // Update the AI message in chatHistory
+      if (result.success && result.data) {
+        let lastContent = '';
+        let lastStreaming = true;
+        for await (const delta of readStreamableValue(result.data.stream)) {
+          fullResponse += delta;
+          lastContent = fullResponse;
+          // Update the AI message in chatHistory
+          setActiveChat(prev => {
+            if (!prev) return prev;
+            const updatedHistory = prev.chatHistory.map((msg, idx) =>
+              idx === prev.chatHistory.length - 1
+                ? { ...msg, content: lastContent, isStreaming: lastStreaming }
+                : msg
+            );
+            return { ...prev, chatHistory: updatedHistory };
+          });
+        }
+        // Finalize the AI message state
+        lastStreaming = false;
         setActiveChat(prev => {
           if (!prev) return prev;
           const updatedHistory = prev.chatHistory.map((msg, idx) =>
@@ -660,85 +673,120 @@ export default function ChatComponent({ activeChat, user, setActiveChat, setChat
           );
           return { ...prev, chatHistory: updatedHistory };
         });
-      }
-      // Finalize the AI message state
-      lastStreaming = false;
-      setActiveChat(prev => {
-        if (!prev) return prev;
-        const updatedHistory = prev.chatHistory.map((msg, idx) =>
-          idx === prev.chatHistory.length - 1
-            ? { ...msg, content: lastContent, isStreaming: lastStreaming }
-            : msg
-        );
-        return { ...prev, chatHistory: updatedHistory };
-      });
-      chatToUpdate.chatHistory[chatToUpdate.chatHistory.length-1].content = fullResponse
-      chatToUpdate.chatHistory[chatToUpdate.chatHistory.length-1].isStreaming = false
+        chatToUpdate.chatHistory[chatToUpdate.chatHistory.length-1].content = fullResponse
+        chatToUpdate.chatHistory[chatToUpdate.chatHistory.length-1].isStreaming = false
 
-      let imgResponse = "";
+        let imgResponse = "";
 
-      if (result.data.img) {
-        for await (const delta of readStreamableValue(result.data.img)) {
-          imgResponse += delta;
+        if (result.data.img) {
+          for await (const delta of readStreamableValue(result.data.img)) {
+            imgResponse += delta;
+          }
+          if (imgResponse) {
+            // Add AI image message after streaming is complete
+            const aiImageMessage: Message = {
+              id: Date.now() + 2,
+              content: `data:image/png;base64,${imgResponse}`,
+              role: 'model',
+              isStreaming: false,
+            };
+            chatToUpdate = {
+              ...chatToUpdate!,
+              chatHistory: [...chatToUpdate!.chatHistory, aiImageMessage],
+            };
+            setActiveChat(chatToUpdate);
+          }
         }
-        if (imgResponse) {
-          // Add AI image message after streaming is complete
-          const aiImageMessage: Message = {
-            id: Date.now() + 2,
-            content: `data:image/png;base64,${imgResponse}`,
-            role: 'model',
-            isStreaming: false,
-          };
-          chatToUpdate = {
-            ...chatToUpdate!,
-            chatHistory: [...chatToUpdate!.chatHistory, aiImageMessage],
-          };
-          setActiveChat(chatToUpdate);
+      } else {
+        // Handle error: show an error message in the chat
+
+        chatToUpdate.chatHistory.pop(); //remove old placeholder
+        setActiveChat(chatToUpdate)// update both
+
+
+        const errorMessage: Message = { id: Date.now() + 1, content: `Youve probably reached token limit by having too much context or images in this chat try starting a new chat.\nError: ${result.error}`, role: 'model', isStreaming: false };
+        chatToUpdate.chatHistory.push(errorMessage);
+        setActiveChat(prev => {
+          if (!prev) return ({
+            _id: 'error-chat',
+            title: 'Error Chat',
+            model: selectedModel.id,
+            chatHistory: [errorMessage],
+            attachments: [],
+          });
+          return { ...prev, chatHistory: [...prev.chatHistory, errorMessage] };
+        });
+        
+        
+      } 
+
+      const saveResp = await saveChatToDbAction(chatToUpdate, user);
+      if (!saveResp.success) throw new Error("Could not save chat to DB!" + saveResp.error);
+
+      setChatList(
+        prev => {
+          const existingIndex = prev.findIndex(chat => chat._id === chatToUpdate._id);
+          if (existingIndex !== -1) {
+            // Update existing chat
+            const updatedChats = [...prev];
+            updatedChats[existingIndex] = chatToUpdate;
+            return updatedChats;
+          } else {
+            // Add new chat
+            return [...prev, chatToUpdate];
+          }
         }
+      )
+
+      setIsSending(false);
+
+    } catch(error) {
+      // Remove placeholder message if it exists
+      if (activeChat && activeChat.chatHistory[activeChat.chatHistory.length-1].role === 'model' && activeChat.chatHistory[activeChat.chatHistory.length-1].content === "") {
+        activeChat.chatHistory.pop();
       }
-    } else {
-      // Handle error: show an error message in the chat
-
-      chatToUpdate.chatHistory.pop(); //remove old placeholder
-      setActiveChat(chatToUpdate)// update both
-
-
-      const errorMessage: Message = { id: Date.now() + 1, content: `Youve probably reached token limit by having too much context or images in this chat try starting a new chat.\nError: ${result.error}`, role: 'model', isStreaming: false };
       
-      setActiveChat(prev => {
-        if (!prev) return ({
+      const errorMessage: Message = { 
+        id: Date.now() + 1, 
+        content: `You've probably reached token limit by having too much context or images in this chat. Try starting a new chat.\nError: ${error instanceof Error ? error.message : String(error)}`, 
+        role: 'model', 
+        isStreaming: false 
+      };
+      
+      setIsSending(false);
+      
+      let chatToUpdate: Chat;
+      
+      if (!activeChat) {
+        // Create new error chat
+        chatToUpdate = {
           _id: 'error-chat',
           title: 'Error Chat',
           model: selectedModel.id,
           chatHistory: [errorMessage],
           attachments: [],
-        });
-        return { ...prev, chatHistory: [...prev.chatHistory, errorMessage] };
-       
-      }); 
-      chatToUpdate.chatHistory.push(errorMessage);
-      
-    } 
-
-    const saveResp = await saveChatToDbAction(chatToUpdate, user);
-    if (!saveResp.success) throw new Error("Could not save chat to DB!" + saveResp.error);
-
-    setChatList(
-      prev => {
-        const existingIndex = prev.findIndex(chat => chat._id === chatToUpdate._id);
-        if (existingIndex !== -1) {
-          // Update existing chat
-          const updatedChats = [...prev];
-          updatedChats[existingIndex] = chatToUpdate;
-          return updatedChats;
-        } else {
-          // Add new chat
-          return [...prev, chatToUpdate];
-        }
+        };
+        setActiveChat(chatToUpdate);
+      } else {
+        // Update existing chat
+        chatToUpdate = {
+          ...activeChat,
+          chatHistory: [...activeChat.chatHistory, errorMessage],
+        };
+        setActiveChat(chatToUpdate);
       }
-    )
-
-    setIsSending(false);
+      
+      // Save the updated chat to database
+      try {
+        const saveResp = await saveChatToDbAction(chatToUpdate, user);
+        if (!saveResp.success) {
+          console.error("Could not save error chat to DB:", saveResp.error);
+          // Optionally show user notification about save failure
+        }
+      } catch (saveError) {
+        console.error("Error saving chat to DB:", saveError);
+      }
+    }
   };
 
   const handleKeyPress = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -866,7 +914,7 @@ export default function ChatComponent({ activeChat, user, setActiveChat, setChat
               )}
             </div>
             {msg.role === 'user' && (
-              <div className="w-10 h-10 flex-shrink-0 flex items-center justify-center bg-gray-600 rounded-full">
+              <div className="mt-4 w-10 h-10 flex-shrink-0 flex items-center justify-center bg-gray-600 rounded-full">
           <User className="w-6 h-6 text-gray-300" />
               </div>
             )}
