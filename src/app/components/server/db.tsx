@@ -143,20 +143,21 @@ export async function sendMessageToGemeni(selectedModel: string, chat: Chat) {
     // Efficiently partition attachments into those matching the last message and the rest
     const lastMessage = chat.chatHistory[chat.chatHistory.length - 1];
     const attachments = chat.attachments || [];
+    
     const [inlineData, previousInlineData] = attachments.reduce<[any[], any[]]>(
       ([match, rest], att) => {
         if (lastMessage && att.id === lastMessage.id) {
-          match.push({
+            match.push({
             inlineData: {
               mimeType: att.fileType,
-              data: att.fileData,
+              data: String(att.fileData),
             },
-          });
+            });
         } else {
           rest.push({
             inlineData: {
               mimeType: att.fileType,
-              data: att.fileData,
+              data: String(att.fileData),
             },
           });
         }
@@ -164,17 +165,18 @@ export async function sendMessageToGemeni(selectedModel: string, chat: Chat) {
       },
       [[], []]
     );
-
+    const allInlineData = [...inlineData, ...previousInlineData];
+    console.log(allInlineData);
     // Start the streaming process immediately without awaiting
     (async () => {
       try {
         const ai = new GoogleGenAI({ apiKey: process.env.GOOGLE_API_KEY as string });
         const response = await ai.models.generateContentStream({
           model: selectedModel,
-          contents: "This is the context of user and ai assistant conversation." + JSON.stringify(chatHistory) + " the first " + inlineData.length + " inline data elements are new attachments from the most recent message, the other " + previousInlineData.length + " are previous attachments." +
+          contents: createUserContent(["This is the context of user and ai assistant conversation." + JSON.stringify(chatHistory) + " the first " + inlineData.length + " inline data elements are new attachments from the most recent message, the other " + previousInlineData.length + " are previous attachments." +
             "(when the user is referencing the attachments in the prompt of the most recent message, they are likely to refering to the new set of attachments, if there are no attachments in the first set and the user tries to reference new attachments remind the user that they did not attach new data," +
             "for example, user asks what is this? when there are no new attachments.)" + " Continue the conversation with the user by answering the most recent message, user may refer to older attachments so carefully read context to understand " +
-            "what the user is refering to."
+            "what the user is refering to.", ...allInlineData])
         });
         
         for await (const chunk of response) {

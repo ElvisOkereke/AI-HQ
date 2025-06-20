@@ -1,13 +1,14 @@
 'use client';
 import React from 'react'
 import { useState, useRef, useEffect } from 'react';
-import { Building2, User, CornerDownLeft, Paperclip, AlertTriangle, X, FileText, Image, CheckCircle, Loader2, Copy, Check, Menu } from 'lucide-react';
+import { Building2, User, CornerDownLeft, Paperclip, AlertTriangle, X, FileText, Image, CheckCircle, Loader2, Copy, Check, Menu, MoreHorizontal, RefreshCw, GitBranch, Download, Edit, Trash2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { newObjectIdAction, sendMessageToAIAction, generateTitleAction, saveChatToDbAction, updateChatModelAction } from '../actions/dbActions'
 import { readStreamableValue } from 'ai/rsc'
 import ModelDropdown, { llmModels } from './ModelDropdown';
 import { ChatProps, Attachment, Message, LLMModel, Chat} from "../../types/types"
-import {MessageContent} from './MessageFormatting';
+import {MessageContent, MessageMenu} from './MessageFormatting';
+import { FileUploadButton } from './FileUpload';
 
 
 function WelcomeScreen() {
@@ -55,112 +56,6 @@ function AttachmentPreview({
         <X className="w-3 h-3" />
       </button>
     </motion.div>
-  );
-}
-
-function FileUploadButton({ onFileUpload }: { onFileUpload: (fileData: string, fileType: string, fileName: string) => void }) {
-  const [uploading, setUploading] = useState(false);
-  const [uploadSuccess, setUploadSuccess] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const handleButtonClick = () => {
-    fileInputRef.current?.click();
-  };
-
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    setUploading(true);
-    setUploadSuccess(false);
-
-    try {
-      if (file.type.startsWith('image/')) {
-        const reader = new FileReader();
-        reader.onload = () => {
-          if (typeof reader.result === 'string') {
-            onFileUpload(reader.result, file.type, file.name);
-            setUploadSuccess(true);
-            setTimeout(() => setUploadSuccess(false), 2000);
-          }
-          setUploading(false);
-        };
-        reader.onerror = () => {
-          setUploading(false);
-          alert('Error reading image file.');
-        };
-        reader.readAsDataURL(file);
-      } else if (file.type === 'text/plain') {
-        const reader = new FileReader();
-        reader.onload = () => {
-          if (typeof reader.result === 'string') {
-            onFileUpload(reader.result, file.type, file.name);
-            setUploadSuccess(true);
-            setTimeout(() => setUploadSuccess(false), 2000);
-          }
-          setUploading(false);
-        };
-        reader.onerror = () => {
-          setUploading(false);
-          alert('Error reading text file.');
-        };
-        reader.readAsText(file);
-      } else {
-        alert('Only image or .txt files are supported.');
-        setUploading(false);
-      }
-    } catch (error) {
-      console.error('File upload error:', error);
-      alert('Error uploading file.');
-      setUploading(false);
-    }
-    
-    e.target.value = '';
-  };
-
-  return (
-    <>
-      <button
-        type="button"
-        className={`p-2 rounded-full transition-all duration-200 relative ${
-          uploading 
-            ? 'text-blue-400 bg-blue-500/20' 
-            : uploadSuccess 
-              ? 'text-green-400 bg-green-500/20' 
-              : 'text-gray-400 hover:text-white hover:bg-white/10'
-        }`}
-        onClick={handleButtonClick}
-        title="Attach file"
-        disabled={uploading}
-      >
-        {uploading ? (
-          <Loader2 className="w-5 h-5 animate-spin" />
-        ) : uploadSuccess ? (
-          <CheckCircle className="w-5 h-5" />
-        ) : (
-          <Paperclip className="w-5 h-5" />
-        )}
-        
-        {/* Status indicator dot */}
-        {uploading && (
-          <span className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-blue-400 animate-pulse" />
-        )}
-        {uploadSuccess && !uploading && (
-          <motion.span
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-            className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-green-500"
-          />
-        )}
-      </button>
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="image/*,.txt"
-        className="hidden"
-        onChange={handleFileChange}
-      />
-    </>
   );
 }
 
@@ -230,6 +125,8 @@ export default function ChatComponent({ activeChat, user, setActiveChat, setChat
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [isSending, setIsSending] = useState(false);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [editingMessage, setEditingMessage] = useState<number | null>(null);
+  const [editText, setEditText] = useState('');
 
   // Update selected model when active chat changes
   useEffect(() => {
@@ -246,7 +143,7 @@ export default function ChatComponent({ activeChat, user, setActiveChat, setChat
   };
 
   useEffect(() => {
-    scrollToBottom();
+    if (isSending) scrollToBottom();
   }, [activeChat]);
 
   useEffect(() => {
@@ -255,6 +152,128 @@ export default function ChatComponent({ activeChat, user, setActiveChat, setChat
         textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
     }
   }, [input]);
+
+  const handleCopyMessage = (content: string) => {
+    navigator.clipboard.writeText(content);
+  };
+
+  const handleDownloadImage = (content: string) => {
+    const link = document.createElement('a');
+    link.href = content;
+    link.download = `image-${Date.now()}.png`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleEditMessage = (messageId: number, content: string) => {
+    setEditingMessage(messageId);
+    setEditText(content);
+  };
+
+  const handleSaveEdit = async (messageId: number) => {
+    if (!activeChat || !user?.email) return;
+    
+    if (editText.trim() === '') {
+      if (confirm('Delete this message? This action cannot be undone.')) {
+        handleDeleteMessage(messageId);
+      }
+      return;
+    }
+
+    const updatedChat = {
+      ...activeChat,
+      chatHistory: activeChat.chatHistory.map(msg =>
+        msg.id === messageId ? { ...msg, content: editText } : msg
+      )
+    };
+    
+    setActiveChat(updatedChat);
+    setEditingMessage(null);
+    setEditText('');
+    
+    try {
+      await saveChatToDbAction(updatedChat, user);
+      setChatList(prev => 
+        prev.map(chat => 
+          chat._id === activeChat._id ? updatedChat : chat
+        )
+      );
+    } catch (error) {
+      console.error('Error saving edited message:', error);
+    }
+  };
+
+  const handleDeleteMessage = async (messageId: number) => {
+    if (!activeChat || !user?.email) return;
+    
+    const updatedChat = {
+      ...activeChat,
+      chatHistory: activeChat.chatHistory.filter(msg => msg.id !== messageId)
+    };
+    
+    setActiveChat(updatedChat);
+    
+    try {
+      await saveChatToDbAction(updatedChat, user);
+      setChatList(prev => 
+        prev.map(chat => 
+          chat._id === activeChat._id ? updatedChat : chat
+        )
+      );
+    } catch (error) {
+      console.error('Error deleting message:', error);
+    }
+  };
+
+  const handleRegenerateMessage = async (messageId: number) => {
+    if (!activeChat || !user?.email) return;
+    
+    const messageIndex = activeChat.chatHistory.findIndex(msg => msg.id === messageId);
+    if (messageIndex === -1) return;
+    
+    // Remove the message and all subsequent messages
+    const updatedHistory = activeChat.chatHistory.slice(0, messageIndex);
+    const updatedChat = { ...activeChat, chatHistory: updatedHistory };
+    setActiveChat(updatedChat);
+    
+    // Regenerate from the previous user message
+    const lastUserMessage = updatedHistory.slice().reverse().find(msg => msg.role === 'user');
+    if (lastUserMessage) {
+      setIsSending(true);
+      // Trigger regeneration logic similar handleSend
+    }
+  };
+
+  const handleBranchChat = async (messageId: number) => {
+    if (!activeChat || !user?.email) return;
+    
+    const messageIndex = activeChat.chatHistory.findIndex(msg => msg.id === messageId);
+    if (messageIndex === -1) return;
+    
+    // Create new chat with history up to this message
+    const branchedHistory = activeChat.chatHistory.slice(0, messageIndex + 1);
+    const idResp = await newObjectIdAction();
+    
+    if (idResp.success && idResp.data) {
+      const newId = JSON.parse(idResp.data);
+      const branchedChat = {
+        _id: newId,
+        title: `${activeChat.title} (Branch)`,
+        model: activeChat.model,
+        chatHistory: branchedHistory,
+        attachments: activeChat.attachments
+      };
+      
+      try {
+        await saveChatToDbAction(branchedChat, user);
+        setChatList(prev => [...prev, branchedChat]);
+        setActiveChat(branchedChat);
+      } catch (error) {
+        console.error('Error creating branch:', error);
+      }
+    }
+  };
 
   const handleModelChange = async (newModel: LLMModel) => {
     // If no active chat or same model, just update selected model
@@ -328,19 +347,22 @@ export default function ChatComponent({ activeChat, user, setActiveChat, setChat
     if (!user?.email) throw new Error('Something went wrong, user not authenticated');
     try {
       const messageInput = input;
-      const messageAttachments = [...attachments];
+      let messageAttachments = [] as Attachment[];
       
       setInput('');
-      setAttachments([]); // Clear attachments after sending
+      
       setIsSending(true);
 
       const id = Date.now()
 
       const userMessage: Message = { id: id, content: messageInput, role: 'user'};
 
-      if (messageAttachments.length > 0){
-      const updatedAttachments = messageAttachments.map(att => ({ ...att, id: id }));
-      setAttachments(updatedAttachments);}
+      if (attachments.length > 0){
+      messageAttachments = attachments.map(att => ({ ...att, id: id }));
+      //setAttachments(updatedAttachments);
+      setAttachments([]); // Clear attachments after sending
+      }
+      
 
       let chatToUpdate = activeChat;
       if (activeChat) {
@@ -350,7 +372,6 @@ export default function ChatComponent({ activeChat, user, setActiveChat, setChat
         
         const idResp = await newObjectIdAction();
         const titleResp = await generateTitleAction(selectedModel.id, userMessage);
-        console.log(idResp.success, titleResp.success)
         if (idResp.success && idResp.data && titleResp.success && titleResp.data) {
           const id = JSON.parse(idResp.data);
           const title = titleResp.data;
@@ -377,8 +398,8 @@ export default function ChatComponent({ activeChat, user, setActiveChat, setChat
         isStreaming: true,
       };
       chatToUpdate = {
-        ...chatToUpdate!,
-        chatHistory: [...chatToUpdate!.chatHistory, aiMessagePlaceholder],
+        ...chatToUpdate,
+        chatHistory: [...chatToUpdate.chatHistory, aiMessagePlaceholder],
       };
       setActiveChat(chatToUpdate);
       
@@ -430,8 +451,8 @@ export default function ChatComponent({ activeChat, user, setActiveChat, setChat
               isStreaming: false,
             };
             chatToUpdate = {
-              ...chatToUpdate!,
-              chatHistory: [...chatToUpdate!.chatHistory, aiImageMessage],
+              ...chatToUpdate,
+              chatHistory: [...chatToUpdate.chatHistory, aiImageMessage],
             };
             setActiveChat(chatToUpdate);
           }
@@ -458,6 +479,7 @@ export default function ChatComponent({ activeChat, user, setActiveChat, setChat
         
         
       } 
+      console.log(chatToUpdate.attachments)
 
       const saveResp = await saveChatToDbAction(chatToUpdate, user);
       if (!saveResp.success) throw new Error("Could not save chat to DB!" + saveResp.error);
@@ -534,7 +556,6 @@ export default function ChatComponent({ activeChat, user, setActiveChat, setChat
       handleSend();
     }
   };
-
 
   if (!activeChat) {//show new chat screen
     return (
@@ -627,34 +648,49 @@ export default function ChatComponent({ activeChat, user, setActiveChat, setChat
       {/* Chat Messages */}
       <main className="flex-1 overflow-y-auto p-6 space-y-8">
         {activeChat.chatHistory.map((msg, index) => (
-          <div key={msg.id} className={`flex items-start gap-4 ${msg.role === 'user' ? 'justify-end' : ''}`}>
+          <div
+            key={msg.id}
+            className={`flex items-start gap-4 group ${msg.role === 'user' ? 'justify-end' : ''}`}
+          >
             {msg.role === 'ai' && (
               <div className="w-10 h-10 flex-shrink-0 flex items-center justify-center bg-gradient-to-br from-purple-500 to-blue-500 rounded-full">
-          <Building2 className="w-6 h-6 text-white" />
+                <Building2 className="w-6 h-6 text-white" />
               </div>
             )}
-            <div className={`max-w-xl p-4 rounded-xl ${
+            <div className={`relative max-w-xl p-4 rounded-xl ${
               msg.role === 'user'
-          ? 'bg-blue-600 rounded-br-none'
-          : 'bg-gray-700 rounded-bl-none'
+                ? 'bg-blue-600 rounded-br-none'
+                : 'bg-gray-700 rounded-bl-none'
             }`}>
               {/^data:image\/[a-zA-Z]+;base64,/.test(msg.content) ? (
-          <img
-            src={msg.content}
-            alt="attachment"
-            className="max-w-xs max-h-64 rounded-lg border border-gray-600"
-          />
+                <img
+                  src={msg.content}
+                  alt="attachment"
+                  className="max-w-xs max-h-64 rounded-lg border border-gray-600"
+                />
               ) : (
-          <div>
-            <MessageContent content={msg.content} />
-            {/* Streaming Indicator */}
-            {msg.isStreaming && <span className="inline-block w-2 h-4 bg-white ml-2 animate-pulse rounded-full" />}
-          </div>
+                <div>
+                  <MessageContent content={msg.content} />
+                  {/* Streaming Indicator */}
+                  {msg.isStreaming && <span className="inline-block w-2 h-4 bg-white ml-2 animate-pulse rounded-full" />}
+                </div>
               )}
+              {/* Message Menu */}
+              <div className="absolute bottom-2 right-2">
+                <MessageMenu
+                  message={msg}
+                  onCopy={() => handleCopyMessage(msg.content)}
+                  onRegenerate={msg.role !== 'user' ? () => handleRegenerateMessage(msg.id) : undefined}
+                  onBranch={msg.role !== 'user' ? () => handleBranchChat(msg.id) : undefined}
+                  onDelete={() => handleDeleteMessage(msg.id)}
+                  onDownload={/^data:image\/[a-zA-Z]+;base64,/.test(msg.content) ? () => handleDownloadImage(msg.content) : undefined}
+                  onEdit={msg.role === 'user' ? () => handleEditMessage(msg.id, msg.content) : undefined}
+                />
+              </div>
             </div>
             {msg.role === 'user' && (
               <div className="mt-4 w-10 h-10 flex-shrink-0 flex items-center justify-center bg-gray-600 rounded-full">
-          <User className="w-6 h-6 text-gray-300" />
+                <User className="w-6 h-6 text-gray-300" />
               </div>
             )}
           </div>

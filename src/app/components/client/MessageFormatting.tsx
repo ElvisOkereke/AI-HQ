@@ -1,7 +1,10 @@
 'use client';
 import React from 'react'
-import { useState} from 'react';
-import { Copy, Check } from 'lucide-react';
+import { useState, useRef, useEffect } from 'react';
+import { Copy, Check, MoreHorizontal, RefreshCw, GitBranch, Download, Edit, Trash2 } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
+import { Message} from "../../types/types"
+
 
 // Syntax highlighting utility - returns React elements instead of HTML strings
 const syntaxHighlight = (code: string, language: string) => {
@@ -60,7 +63,7 @@ const syntaxHighlight = (code: string, language: string) => {
       { pattern: /\b(def|class|if|elif|else|for|while|try|except|finally|with|as|import|from|return|yield|break|continue|pass|raise|assert|del|global|nonlocal|lambda|and|or|not|in|is)\b/g, class: colors.keyword },
       { pattern: /\b(True|False|None)\b/g, class: colors.constant },
       { pattern: /\b\d+\.?\d*\b/g, class: colors.number },
-      { pattern: /[+\-*/%=<>!&|^~]/g, class: colors.operator },
+      { pattern: /[+\-*/%=<>!&|^~?:]/g, class: colors.operator },
       { pattern: /\bdef\s+([a-zA-Z_][a-zA-Z0-9_]*)/g, class: colors.function, group: 1 },
       { pattern: /\bclass\s+([a-zA-Z_][a-zA-Z0-9_]*)/g, class: colors.type, group: 1 }
     ],
@@ -212,8 +215,8 @@ export function CodeBlock({ code, language }: { code: string; language?: string 
           )}
         </button>
       </div>
-      <pre className="bg-gray-900 p-4 rounded-b-lg overflow-x-auto w-full">
-        <code className="text-sm font-mono text-gray-100 whitespace-pre">
+      <pre className="bg-gray-900 p-4 rounded-b-lg w-full min-w-0">
+        <code className="text-sm font-mono text-gray-100 whitespace-pre-wrap break-words block">
           {highlightedElements}
         </code>
       </pre>
@@ -428,6 +431,117 @@ export function MessageContent({ content }: { content: string }) {
           )}
         </div>
       ))}
+    </div>
+  );
+}
+
+export function MessageMenu({ 
+  message, 
+  onCopy, 
+  onRegenerate, 
+  onBranch, 
+  onDelete, 
+  onDownload, 
+  onEdit 
+}: {
+  message: Message;
+  onCopy: () => void;
+  onRegenerate?: () => void;
+  onBranch?: () => void;
+  onDelete: () => void;
+  onDownload?: () => void;
+  onEdit?: () => void;
+}) {
+  const [isHovered, setIsHovered] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  const handleCopy = () => {
+    onCopy();
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const isImage = /^data:image\/[a-zA-Z]+;base64,/.test(message.content);
+  const isUserMessage = message.role === 'user';
+
+  return (
+    <div 
+      className="relative" 
+      ref={menuRef}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+    >
+      <div className="opacity-0 group-hover:opacity-100 p-1 rounded-full hover:bg-gray-600 transition-all duration-200 text-gray-400 hover:text-white">
+        <MoreHorizontal className="w-4 h-4" />
+      </div>
+      
+      <AnimatePresence>
+        {isHovered && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95, y: -10 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: -20 }}
+            className={`absolute ${isUserMessage ? 'bottom-0 right-10' : 'bottom-0 left-10'} mb-2 bg-gray-800 border border-gray-600 rounded-lg shadow-lg py-1 z-10 min-w-[140px]`}
+          >
+            <button
+              onClick={handleCopy}
+              className="w-full px-3 py-2 text-left text-sm text-gray-300 hover:bg-gray-700 hover:text-white flex items-center gap-2"
+            >
+              {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+              {copied ? 'Copied!' : 'Copy'}
+            </button>
+            
+            {isUserMessage && onEdit && (
+              <button
+                onClick={() => onEdit()}
+                className="w-full px-3 py-2 text-left text-sm text-gray-300 hover:bg-gray-700 hover:text-white flex items-center gap-2"
+              >
+                <Edit className="w-4 h-4" />
+                Edit
+              </button>
+            )}
+            
+            {!isUserMessage && onRegenerate && (
+              <button
+                onClick={() => onRegenerate()}
+                className="w-full px-3 py-2 text-left text-sm text-gray-300 hover:bg-gray-700 hover:text-white flex items-center gap-2"
+              >
+                <RefreshCw className="w-4 h-4" />
+                Regenerate
+              </button>
+            )}
+            
+            {!isUserMessage && onBranch && (
+              <button
+                onClick={() => onBranch()}
+                className="w-full px-3 py-2 text-left text-sm text-gray-300 hover:bg-gray-700 hover:text-white flex items-center gap-2"
+              >
+                <GitBranch className="w-4 h-4" />
+                Branch Chat
+              </button>
+            )}
+            
+            {isImage && onDownload && (
+              <button
+                onClick={() => onDownload()}
+                className="w-full px-3 py-2 text-left text-sm text-gray-300 hover:bg-gray-700 hover:text-white flex items-center gap-2"
+              >
+                <Download className="w-4 h-4" />
+                Download
+              </button>
+            )}
+            
+            <button
+              onClick={() => onDelete()}
+              className="w-full px-3 py-2 text-left text-sm text-red-400 hover:bg-red-500/10 hover:text-red-300 flex items-center gap-2"
+            >
+              <Trash2 className="w-4 h-4" />
+              Delete
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
