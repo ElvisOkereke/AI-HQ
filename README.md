@@ -7,7 +7,7 @@
 
 > **🏆 Cloneathon Contest Entry** - Building the next generation of agentic AI platforms
 
-A modern, full-stack AI chat platform built with the T3 stack, featuring intelligent conversations powered by Google's Gemini AI. This project demonstrates advanced agentic AI capabilities with persistent chat history, user authentication, and a sleek, responsive interface.
+A modern, full-stack AI chat platform built with the NEXTJS 15 and React Server Component Architecture, featuring intelligent conversations powered by Google's Gemini AI, Nvidia NIMs, and HuggingFace Inference Models. This project demonstrates advanced agentic AI capabilities with persistent chat history, user authentication, and a sleek, responsive interface.
 
 ## ✨ Features
 
