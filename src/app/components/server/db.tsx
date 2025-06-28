@@ -449,3 +449,65 @@ export async function updateUserPreferences(email: string, preferences: any) {
   }
 }
 
+export async function createOrUpdateOAuthUser(email: string, name?: string | null, provider?: string) {
+  try {
+    const db = await getDatabase();
+    
+    // Check if user already exists
+    const existingUser = await db.collection('users').findOne({ "email": email });
+    
+    if (existingUser) {
+      // User exists, update last login and ensure they have all required fields
+      const updateData: any = {
+        lastLoginAt: new Date(),
+        updatedAt: new Date()
+      };
+      
+      // Update name if provided and different
+      if (name && name !== existingUser.name) {
+        updateData.name = name;
+      }
+      
+      // Ensure user has required fields for update system
+      if (!existingUser.lastSeenUpdate) {
+        updateData.lastSeenUpdate = null;
+      }
+      
+      if (!existingUser.preferences) {
+        updateData.preferences = { loggingEnabled: false };
+      }
+      
+      const result = await db.collection('users').updateOne(
+        { "email": email },
+        { $set: updateData }
+      );
+      
+      return { success: true, created: false, userId: existingUser._id };
+    } else {
+      // Create new OAuth user
+      const newUser = {
+        email: email,
+        name: name || 'OAuth User',
+        provider: provider || 'oauth',
+        lastSeenUpdate: null,
+        preferences: {
+          loggingEnabled: false
+        },
+        createdAt: new Date(),
+        lastLoginAt: new Date()
+      };
+      
+      const result = await db.collection('users').insertOne(newUser);
+      
+      if (result.acknowledged) {
+        return { success: true, created: true, userId: result.insertedId };
+      } else {
+        throw new Error('Failed to create OAuth user');
+      }
+    }
+  } catch (error) {
+    console.error('Error creating/updating OAuth user:', error);
+    throw new Error(error instanceof Error ? error.message : String(error));
+  }
+}
+

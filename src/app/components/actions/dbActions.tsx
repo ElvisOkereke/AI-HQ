@@ -102,3 +102,14 @@ export async function getUserPreferencesAction(email: string) {
   }
 }
 
+export async function createOrUpdateOAuthUserAction(email: string, name?: string | null, provider?: string) {
+  try {
+    const { createOrUpdateOAuthUser } = await import('../server/db');
+    const result = await createOrUpdateOAuthUser(email, name, provider);
+    return { success: true, data: result };
+  } catch (error) {
+    console.error('Error creating/updating OAuth user:', error);
+    return { success: false, error: error instanceof Error ? error.message : String(error) };
+  }
+}
+

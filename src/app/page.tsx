@@ -9,7 +9,7 @@ import UpdateAlert from './components/client/UpdateAlert';
 import { Building2, Menu } from 'lucide-react';
 import { useSession, signIn, signOut } from "next-auth/react";
 import { Chat, User } from "./types/types";
-import { getUserPreferencesAction } from './components/actions/dbActions';
+import { getUserPreferencesAction, createOrUpdateOAuthUserAction } from './components/actions/dbActions';
 import { logger } from './utils/logger';
 
 export default function HomePage() {
@@ -59,7 +59,41 @@ export default function HomePage() {
             
             logger.auth('User preferences loaded:', userData);
           } else {
-            // Set default user data if preferences load fails
+            // User preferences not found - likely an OAuth user not yet in database
+            // Try to create the OAuth user
+            logger.warn('User preferences not found, attempting to create OAuth user');
+            
+            if (session.user?.email) {
+              try {
+                const createResult = await createOrUpdateOAuthUserAction(
+                  session.user.email,
+                  session.user.name,
+                  'github' // Default to github, can be improved to detect actual provider
+                );
+                
+                if (createResult.success) {
+                  logger.auth('OAuth user created/updated successfully');
+                  
+                  // Retry loading preferences
+                  const retryResult = await getUserPreferencesAction(session.user.email);
+                  if (retryResult.success && retryResult.data) {
+                    const userData: User = {
+                      name: session.user.name || null,
+                      email: session.user.email || null,
+                      lastSeenUpdate: retryResult.data.lastSeenUpdate || null,
+                      preferences: retryResult.data.preferences || { loggingEnabled: false }
+                    };
+                    setUserPreferences(userData);
+                    logger.auth('User preferences loaded after OAuth user creation:', userData);
+                    return;
+                  }
+                }
+              } catch (createError) {
+                logger.error('Failed to create OAuth user:', createError);
+              }
+            }
+            
+            // Fallback: Set default user data if all else fails
             if (session.user) {
               const defaultUserData: User = {
                 name: session.user.name || null,
@@ -68,6 +102,7 @@ export default function HomePage() {
                 preferences: { loggingEnabled: false }
               };
               setUserPreferences(defaultUserData);
+              logger.auth('Using default user data as fallback');
             }
           }
         } catch (error) {
