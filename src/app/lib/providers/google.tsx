@@ -103,7 +103,7 @@ export class GoogleProvider implements ModelProvider {
       model: 'gemini-2.0-flash',
       contents: `Using this initial user message "${userMessage.content}" output a singular title for this User to AI chat instance, ONLY RESPOND WITH TITLE`
     });
-    return response.text;
+    return response.candidates?.[0]?.content?.parts?.[0]?.text || 'Untitled Chat';
   }
 
   supportsImageGeneration(modelId: string): boolean {

@@ -1,56 +1,80 @@
-# 🚀 T3 Chat Clone - Agentic AI Platform
+# 🚀 AI.HQ - Multi-Provider AI Chat Platform
 
-[![Next.js](https://img.shields.io/badge/Next.js-14-black)](https://nextjs.org/)
+[![Next.js](https://img.shields.io/badge/Next.js-15-black)](https://nextjs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-blue)](https://www.typescriptlang.org/)
 [![MongoDB](https://img.shields.io/badge/MongoDB-6-green)](https://www.mongodb.com/)
-[![Google AI](https://img.shields.io/badge/Google_AI-Gemini-orange)](https://ai.google/)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-3-38B2AC)](https://tailwindcss.com/)
+[![NextAuth.js](https://img.shields.io/badge/NextAuth.js-4-purple)](https://next-auth.js.org/)
 
-> **🏆 Cloneathon Contest Entry** - Building the next generation of agentic AI platforms
+> **🎯 Production-Ready AI Chat Platform** - Enterprise-grade multi-provider AI conversations
 
-A modern, full-stack AI chat platform built with the NEXTJS 15 and React Server Component Architecture, featuring intelligent conversations powered by Google's Gemini AI, Nvidia NIMs, and HuggingFace Inference Models. This project demonstrates advanced agentic AI capabilities with persistent chat history, user authentication, and a sleek, responsive interface.
+A sophisticated, full-stack AI chat platform built with Next.js 15 and modern React architecture. Features seamless integration with multiple AI providers (Google Gemini, Nvidia NIMs, HuggingFace), advanced logging systems, responsive mobile design, and comprehensive user management. Perfect for developers and teams who need a reliable, scalable AI chat solution.
 
 ## ✨ Features
 
-### 🤖 Advanced AI Capabilities
-- **Multi-Model Support** - Switch between different Gemini AI models
-- **Context-Aware Conversations** - Maintains conversation history for coherent interactions
-- **Intelligent Response Generation** - Leverages Google's latest Gemini AI technology
-- **Real-time Chat** - Instant AI responses with typing indicators
+### 🤖 Multi-Provider AI Integration
+- **Multiple AI Providers** - Google Gemini, Nvidia NIMs, HuggingFace, OpenAI, Anthropic
+- **Dynamic Model Switching** - Change AI models mid-conversation with context preservation
+- **Streaming Responses** - Real-time AI response streaming with typing indicators
+- **Image Generation** - AI-powered image creation (Gemini 2.0 Flash)
+- **Context Preservation** - Intelligent conversation history management
+- **Provider Registry** - Modular system for easy AI provider integration
 
-### 🔐 User Management
-- **Secure Authentication** - User registration and login system
-- **Password Protection** - Secure credential handling (with Argon2 hashing ready)
-- **Persistent Sessions** - Stay logged in across browser sessions
-- **User Profiles** - Personalized chat experiences
+### 🔐 Advanced Authentication & User Management
+- **NextAuth.js Integration** - Secure OAuth and credentials-based authentication
+- **GitHub OAuth** - One-click sign-in with GitHub
+- **User Preferences** - Persistent user settings and preferences
+- **Update Notifications** - Automatic alerts for new features and updates
+- **Session Management** - Secure, persistent user sessions
 
-### 💾 Data Persistence
-- **MongoDB Integration** - Robust database with MongoDB Atlas support
-- **Chat History Storage** - Never lose your conversations
-- **User Data Management** - Secure storage of user information
-- **Optimized Queries** - Efficient database operations
+### 💾 Robust Data Architecture
+- **MongoDB Atlas** - Cloud-native database with optimized queries
+- **Chat Persistence** - Never lose conversations with automatic saving
+- **Media Storage** - Integrated file and image attachment system
+- **User Tracking** - Advanced user preference and activity tracking
+- **Data Migration** - Seamless database schema updates
 
-### 🎨 Modern UI/UX
-- **Responsive Design** - Works perfectly on desktop and mobile
-- **Dark/Light Mode** - Adaptive theming for user preference
-- **Real-time Updates** - Live chat interface with smooth animations
-- **Accessibility** - Built with accessibility best practices
+### 📱 Responsive Mobile-First Design
+- **Mobile Optimized** - Fully responsive design with mobile-specific UI
+- **Touch-Friendly** - Optimized for mobile touch interactions
+- **Adaptive Layout** - Smart sidebar that adapts to screen size
+- **Mobile Navigation** - Hamburger menu and gesture-friendly interface
+- **Cross-Platform** - Consistent experience across all devices
+
+### 🛠️ Developer Experience
+- **Advanced Logging System** - Toggleable, categorized logging for debugging
+- **Debug Panel** - Built-in development tools (desktop only)
+- **TypeScript** - Full type safety throughout the application
+- **Error Handling** - Comprehensive error management and user feedback
+- **Hot Reload** - Fast development with Next.js Turbopack
 
 ## 🛠️ Tech Stack
 
 ### Frontend
-- **Next.js 15** - React framework with App Router
-- **TypeScript** - Type-safe development
-- **Tailwind CSS** - Utility-first styling
-- **React Hooks** - Modern state management
+- **Next.js 15** - React framework with App Router and Turbopack
+- **TypeScript** - Full type safety throughout
+- **Tailwind CSS** - Responsive utility-first styling
+- **Framer Motion** - Smooth animations and transitions
+- **Lucide React** - Modern icon library
+- **React Hooks** - Advanced state management
 
-### Backend
-- **Next.js API Routes** - Serverless backend functions
-- **MongoDB** - NoSQL database for scalability
-- **Server-Only Components** - Secure server-side operations
+### Backend & Database
+- **Next.js Server Actions** - Type-safe server functions
+- **MongoDB Atlas** - Cloud NoSQL database
+- **NextAuth.js** - Authentication and session management
+- **Server Components** - Secure server-side operations
 
 ### AI Integration
-- **Google Generative AI** - Powered by Gemini models
-- **Error Handling** - Robust AI response management
+- **Google Generative AI** - Gemini 2.0 Flash and Pro models
+- **Nvidia NIMs** - Enterprise AI inference
+- **HuggingFace** - Open-source model access
+- **OpenAI & Anthropic** - Additional provider support
+- **Streaming Responses** - Real-time AI output
+
+### Development Tools
+- **ESLint & Prettier** - Code quality and formatting
+- **Advanced Logging** - Categorized debug system
+- **Error Boundaries** - Comprehensive error handling
 
 ## 🚀 Quick Start
 
@@ -96,106 +120,267 @@ A modern, full-stack AI chat platform built with the NEXTJS 15 and React Server 
 ## 🏗️ Project Structure
 
 ```
-t3-chat-clone/
-├── app/                    # Next.js 14 App Router
-│   ├── api/               # API routes
-│   ├── components/        # React components
-│   ├── globals.css        # Global styles
-│   └── page.tsx          # Main page
-├── lib/
-│   └── db.tsx            # Database utilities & AI integration
-├── public/               # Static assets
-├── .env.local           # Environment variables
-└── package.json         # Dependencies
+ai-hq-chat/
+├── src/app/                      # Next.js 15 App Router
+│   ├── api/                     # API routes and authentication
+│   │   └── auth/[...nextauth]/  # NextAuth.js configuration
+│   ├── components/              # React components
+│   │   ├── actions/             # Server actions
+│   │   ├── client/              # Client-side components
+│   │   │   ├── Chat.tsx         # Main chat interface
+│   │   │   ├── Sidebar.tsx      # Navigation sidebar
+│   │   │   ├── UpdateAlert.tsx  # Feature update notifications
+│   │   │   ├── DebugPanel.tsx   # Developer debug tools
+│   │   │   └── ...              # Other UI components
+│   │   └── server/              # Server-side components
+│   │       └── db.tsx           # Database operations
+│   ├── lib/                     # Utility libraries
+│   │   └── providers/           # AI provider integrations
+│   │       ├── google.tsx       # Google Gemini integration
+│   │       ├── nvidia.tsx       # Nvidia NIMs integration
+│   │       ├── huggingface.tsx  # HuggingFace integration
+│   │       └── registry.tsx     # Provider management
+│   ├── types/                   # TypeScript type definitions
+│   ├── utils/                   # Utility functions
+│   │   ├── logger.tsx           # Advanced logging system
+│   │   └── mediaUtils.tsx       # Media handling utilities
+│   ├── globals.css              # Global styles and Tailwind
+│   ├── layout.tsx               # Root layout component
+│   └── page.tsx                 # Main application page
+├── public/                      # Static assets
+├── .env.local                   # Environment variables
+├── next.config.ts               # Next.js configuration
+├── tailwind.config.ts           # Tailwind CSS configuration
+└── package.json                 # Dependencies and scripts
 ```
 
 ## 🔧 Configuration
 
+### Required Environment Variables
+```env
+# Database
+NEXT_PUBLIC_MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/database
+
+# Authentication
+NEXTAUTH_SECRET=your-secret-key-here
+NEXTAUTH_URL=http://localhost:3000
+GITHUB_CLIENT_ID=your-github-oauth-client-id
+GITHUB_CLIENT_SECRET=your-github-oauth-client-secret
+
+# AI Providers
+GOOGLE_API_KEY=your-google-ai-api-key
+OPENAI_API_KEY=your-openai-api-key
+ANTHROPIC_API_KEY=your-anthropic-api-key
+HUGGINGFACE_API_KEY=your-huggingface-api-key
+NVIDIA_API_KEY=your-nvidia-nim-api-key
+```
+
 ### Database Setup
 1. Create a MongoDB Atlas cluster
-2. Get your connection string
-3. Add it to your `.env.local` file
+2. Create a database user with read/write permissions
+3. Get your connection string and add it to `.env.local`
+4. The app will automatically create required collections
 
-### Google AI Setup
-1. Go to [Google AI Studio](https://makersuite.google.com/)
-2. Generate an API key
-3. Add it to your environment variables
+### Authentication Setup
+1. **GitHub OAuth**:
+   - Go to GitHub Settings > Developer settings > OAuth Apps
+   - Create a new OAuth App
+   - Set Authorization callback URL to `http://localhost:3000/api/auth/callback/github`
+   - Add client ID and secret to environment variables
 
-### Model Configuration
-The platform supports multiple Gemini models:
-- `gemini-2.5-pro` - Most capable model
-- `gemini-2.5-flash` - Fast responses
-- `gemini-2.0` - Balanced performance
+2. **NextAuth.js**:
+   - Generate a random secret: `openssl rand -base64 32`
+   - Add it as `NEXTAUTH_SECRET` in your environment
+
+### AI Provider Setup
+- **Google Gemini**: Get API key from [Google AI Studio](https://makersuite.google.com/)
+- **OpenAI**: Get API key from [OpenAI Platform](https://platform.openai.com/)
+- **Anthropic**: Get API key from [Anthropic Console](https://console.anthropic.com/)
+- **HuggingFace**: Get API key from [HuggingFace Settings](https://huggingface.co/settings/tokens)
+- **Nvidia NIMs**: Get API key from [Nvidia Developer Portal](https://developer.nvidia.com/)
 
 ## 🎯 Key Features Showcase
 
-### Intelligent Conversation Management
+### Advanced Logging System
 ```typescript
-export async function sendMessageToGemini(selectedModel: string, chatHistory: object[]) {
-  const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
-  const model = genAI.getGenerativeModel({ model: selectedModel });
-  
-  const prompt = "Context: " + JSON.stringify(chatHistory) + 
-                 " Continue the conversation naturally.";
-  
-  const result = await model.generateContent(prompt);
-  return result.response.text();
-}
+// Toggle logging on/off globally
+logger.toggle(true);  // Enable logging
+logger.toggle(false); // Disable logging
+
+// Categorized logging for different areas
+logger.db('Database operation completed');
+logger.ai('AI response received');
+logger.auth('User authentication successful');
+logger.chat('New message sent');
+
+// Available in browser console
+window.logger.toggle(); // Toggle from dev tools
 ```
 
-### Secure User Authentication
+### Dynamic AI Provider Switching
 ```typescript
-export async function verifyPass(credentials: { email?: string, password?: string }) {
-  const db = await getDatabase();
-  const user = await db.collection('users').findOne({ email: credentials.email });
-  
-  // Secure password verification (Argon2 ready)
-  if (user && user.password === credentials.password) {
-    return { id: user._id.toString(), email: user.email, name: user.name };
+// Switch models mid-conversation with context preservation
+const handleModelChange = async (newModel: LLMModel) => {
+  if (activeChat && activeChat.model !== newModel.id) {
+    const result = await updateChatModelAction(activeChat._id, newModel.id, user);
+    if (result.success) {
+      setActiveChat(prev => ({ ...prev, model: newModel.id }));
+      setSelectedModel(newModel);
+    }
   }
-  throw new Error('Invalid credentials');
-}
+};
 ```
+
+### Update Notification System
+```typescript
+// Automatic update alerts for users
+const UPDATE_CONTENT = {
+  version: '2024-12-28-v1',
+  title: 'New Features Available! 🎉',
+  features: [
+    { icon: '🔧', title: 'Advanced Logging System' },
+    { icon: '📱', title: 'Enhanced Mobile Experience' },
+    { icon: '🔔', title: 'Update Notifications' }
+  ]
+};
+
+// Check if user has seen this update
+const hasSeenUpdate = user.lastSeenUpdate === CURRENT_UPDATE_VERSION;
+```
+
+### Mobile-First Responsive Design
+```typescript
+// Smart responsive behavior
+const [isMobile, setIsMobile] = useState(false);
+
+useEffect(() => {
+  const checkScreenSize = () => {
+    const mobile = window.innerWidth < 768;
+    setIsMobile(mobile);
+    if (!mobile) setShowMobileSidebar(false);
+  };
+  
+  checkScreenSize();
+  window.addEventListener('resize', checkScreenSize);
+  return () => window.removeEventListener('resize', checkScreenSize);
+}, []);
+```
+
+## 📱 Mobile Experience
+
+### Mobile-Specific Features
+- **Hamburger Navigation** - Touch-friendly sidebar access
+- **Responsive Layout** - Optimized for all screen sizes
+- **Touch Gestures** - Swipe-friendly interactions
+- **Mobile Header** - Dedicated mobile navigation
+- **Adaptive UI** - Smart component sizing for mobile
+- **Desktop-Only Features** - Debug panel restricted to desktop for better UX
+
+### Mobile Development Considerations
+```typescript
+// Mobile-responsive sidebar
+const [isMobile, setIsMobile] = useState(false);
+const [showMobileSidebar, setShowMobileSidebar] = useState(false);
+
+// Mobile-specific UI adjustments
+className={`${
+  isMobile 
+    ? 'fixed left-0 top-0 h-full z-50 transform transition-transform'
+    : 'relative'
+}`}
+```
+
+## 🛠️ Development Features
+
+### Debug Panel (Desktop Only)
+- **Logging Control** - Toggle logging on/off
+- **Console Management** - Clear console, test messages
+- **Development Tools** - Built-in debugging utilities
+- **Status Monitoring** - Real-time logging status
+- **Browser Integration** - Access via `window.logger`
+
+### Advanced Logging System
+```typescript
+// Categorized logging for different components
+logger.db('Database query executed successfully');
+logger.ai('AI model response received');
+logger.auth('User authentication completed');
+logger.chat('Message sent to conversation');
+
+// Production-safe logging (disabled by default)
+logger.toggle(false); // Always starts disabled
+```
+
+### Update Management
+- **Version Tracking** - Track user's last seen update
+- **Feature Announcements** - Beautiful update notifications
+- **User Preferences** - Persistent settings storage
+- **Database Migrations** - Seamless schema updates
 
 ## 🎨 Design Philosophy
 
 This project embodies modern web development principles:
 
-- **Server-First Architecture** - Leveraging Next.js 14's server components
-- **Type Safety** - Full TypeScript implementation
-- **Performance Optimized** - Code splitting and lazy loading
-- **Scalable Design** - Modular component architecture
+- **Mobile-First Architecture** - Responsive design from the ground up
+- **Server-First Components** - Leveraging Next.js 15's server components
+- **Type Safety** - Full TypeScript implementation throughout
+- **Performance Optimized** - Code splitting, lazy loading, and Turbopack
+- **Scalable Design** - Modular component and provider architecture
 - **Security Focused** - Server-only sensitive operations
+- **Developer Experience** - Advanced tooling and debugging capabilities
 
 ## 🚀 Deployment
 
-### Google Cloud Run (Recommended)
-1. Dockerize
-2. Put it on Docker Registry
-3. Setup Google Cloud Run instance
-4. Deploy
-
-### Dev server
+### Vercel (Recommended)
 ```bash
-npm run build
-npm start
+# Install Vercel CLI
+npm i -g vercel
+
+# Deploy to Vercel
+vercel
+
+# Set environment variables in Vercel dashboard
+# Connect your MongoDB Atlas cluster
+# Configure OAuth providers
 ```
 
-## 🏆 Contest Highlights
+### Docker Deployment
+```dockerfile
+# Build the app
+npm run build
+
+# Create Docker image
+docker build -t ai-hq-chat .
+
+# Run container
+docker run -p 3000:3000 ai-hq-chat
+```
+
+### Production Checklist
+- [ ] Environment variables configured
+- [ ] MongoDB Atlas connected
+- [ ] OAuth providers set up
+- [ ] AI API keys added
+- [ ] Domain and SSL configured
+- [ ] Error monitoring enabled
+
+## 🏆 Project Highlights
 
 ### Why This Project Stands Out
-- **Full-Stack Implementation** - Complete end-to-end solution
-- **Modern Architecture** - Latest Next.js 14 with App Router
-- **AI-First Design** - Built specifically for agentic AI interactions
-- **Production Ready** - Scalable, secure, and performant
-- **Developer Experience** - Clean code, TypeScript, and proper error handling
+- **Enterprise-Grade Architecture** - Production-ready with Next.js 15 and Turbopack
+- **Multi-Provider AI Integration** - Seamless switching between AI providers
+- **Mobile-First Design** - Fully responsive with mobile-specific optimizations
+- **Advanced Developer Tools** - Built-in logging system and debug panel
+- **User-Centric Features** - Update notifications and preference management
+- **Type Safety** - Complete TypeScript implementation with proper error handling
 
 ### Innovation Points
-- Context-aware AI conversations
-- Multi-model AI support
-- Seamless user experience
-- Robust error handling
-- Scalable database design
+- **Dynamic Model Switching** - Change AI providers mid-conversation
+- **Advanced Logging System** - Categorized, toggleable debugging
+- **Update Management** - Automatic feature announcements
+- **Mobile Optimization** - Touch-friendly, responsive design
+- **Developer Experience** - Built-in debug tools and comprehensive documentation
+- **Scalable Architecture** - Modular provider system for easy extension
 
 ## 📝 License
 
