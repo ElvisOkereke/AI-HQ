@@ -12,11 +12,6 @@ const handler = NextAuth({
       clientId: process.env.GITHUB_ID!,
       clientSecret: process.env.GITHUB_SECRET!,
     }),
-    GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID!,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-    }),
-    // Optional: Add credentials provider for email/password
     CredentialsProvider({
       name: 'credentials',
       credentials: {
@@ -51,20 +46,35 @@ const handler = NextAuth({
     })
   ],
   pages: {
-    signIn: '/',
-    error: '/', // Error page URL
+    signIn: '/'
   },
   callbacks: {
     async session({ session, token }) {
-      // Add custom session logic here if needed
-      return session
+      try {
+      if (session.user) {
+        //session.user.id = token.id;
+        session.user.name = token.name;
+        session.user.email = token.email;
+      }
+      return session;
+    } catch (error) {
+      console.error("Session callback error:", error);
+      throw error;
+    }
+      
     },
     async jwt({ token, user }) {
-      // Add custom JWT logic here if needed
-      return token
+      if (user) {
+      token.id = user.id;
+      token.name = user.name;
+      token.email = user.email;
+    }
+    return token;
     },
   },
   secret: process.env.NEXTAUTH_SECRET,
 })
+
+
 
 export { handler as GET, handler as POST }

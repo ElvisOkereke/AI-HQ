@@ -1,13 +1,16 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Sidebar from './components/client/Sidebar';
 import ChatComponent from "./components/client/Chat";
 import SignInForm from './components/client/SignIn';
 import SignUpForm from './components/client/SignUp';
-import { Building2 } from 'lucide-react';
+import UpdateAlert from './components/client/UpdateAlert';
+import { Building2, Menu } from 'lucide-react';
 import { useSession, signIn, signOut } from "next-auth/react";
-import { Chat} from "./types/types"
+import { Chat, User } from "./types/types";
+import { getUserPreferencesAction } from './components/actions/dbActions';
+import { logger } from './utils/logger';
 
 export default function HomePage() {
   const { data: session, status } = useSession();
@@ -16,7 +19,75 @@ export default function HomePage() {
   const [activeChat, setActiveChat] = useState<Chat>();
   const [showSignInForm, setShowSignInForm] = useState(false);
   const [showSignUpForm, setShowSignUpForm] = useState(false);
+  const [userPreferences, setUserPreferences] = useState<User>({});
+  const [showMobileSidebar, setShowMobileSidebar] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
   const router = useRouter();
+  
+  // Check screen size for mobile responsiveness
+  useEffect(() => {
+    const checkScreenSize = () => {
+      const mobile = window.innerWidth < 768;
+      setIsMobile(mobile);
+      if (!mobile) setShowMobileSidebar(false);
+    };
+    
+    checkScreenSize();
+    window.addEventListener('resize', checkScreenSize);
+    return () => window.removeEventListener('resize', checkScreenSize);
+  }, []);
+  
+  // Load user preferences and setup logging
+  useEffect(() => {
+    if (session?.user?.email) {
+      const loadUserPreferences = async () => {
+        try {
+          const result = await getUserPreferencesAction(session.user!.email!);
+          if (result.success && result.data && session.user) {
+            const userData: User = {
+              name: session.user.name || null,
+              email: session.user.email || null,
+              lastSeenUpdate: result.data.lastSeenUpdate || null,
+              preferences: result.data.preferences || { loggingEnabled: false }
+            };
+            setUserPreferences(userData);
+            
+            // Configure logging based on user preferences
+            if (result.data.preferences?.loggingEnabled) {
+              logger.toggle(true);
+            }
+            
+            logger.auth('User preferences loaded:', userData);
+          } else {
+            // Set default user data if preferences load fails
+            if (session.user) {
+              const defaultUserData: User = {
+                name: session.user.name || null,
+                email: session.user.email || null,
+                lastSeenUpdate: undefined,
+                preferences: { loggingEnabled: false }
+              };
+              setUserPreferences(defaultUserData);
+            }
+          }
+        } catch (error) {
+          logger.error('Failed to load user preferences:', error);
+          // Set default user data on error
+          if (session?.user) {
+            const defaultUserData: User = {
+              name: session.user.name || null,
+              email: session.user.email || null,
+              lastSeenUpdate: undefined,
+              preferences: { loggingEnabled: false }
+            };
+            setUserPreferences(defaultUserData);
+          }
+        }
+      };
+      
+      loadUserPreferences();
+    }
+  }, [session?.user?.email]);
 
   // Handle logout using NextAuth
   const handleLogout = () => signOut();
@@ -115,25 +186,75 @@ export default function HomePage() {
 
   // Show main app if authenticated
   return (
-    <div className="flex h-screen bg-gray-900 text-white font-sans">
-      <Sidebar 
-        chatList={chatList}
-        activeChat={activeChat} 
-        setChatList={setChatList}
-        setActiveChat={setActiveChat}
-        onLogout={handleLogout}
-        user={session.user}
-      />
-      <main className="flex-1 flex flex-col">
-        <ChatComponent 
-          key={activeChat?._id || 'new'} 
+    <div className="flex h-screen bg-gray-900 text-white font-sans overflow-hidden">
+      {/* Update Alert */}
+      {userPreferences.email && (
+        <UpdateAlert 
+          user={userPreferences}
+          onDismiss={() => {
+            // Refresh user preferences to hide the alert
+            setUserPreferences(prev => ({
+              ...prev,
+              lastSeenUpdate: '2024-12-28-v1' // Current version
+            }));
+          }}
+        />
+      )}
+      
+      {/* Mobile Sidebar Backdrop */}
+      {isMobile && showMobileSidebar && (
+        <div 
+          className="fixed inset-0 bg-black/50 z-40"
+          onClick={() => setShowMobileSidebar(false)}
+        />
+      )}
+      
+      {/* Sidebar */}
+      <div className={`${isMobile ? 
+        `fixed left-0 top-0 h-full z-50 transform transition-transform duration-300 ${
+          showMobileSidebar ? 'translate-x-0' : '-translate-x-full'
+        }` : 
+        ''
+      }`}>
+        <Sidebar 
+          chatList={chatList}
           activeChat={activeChat} 
-          setActiveChat={setActiveChat} 
-          setChatList={setChatList} 
-          user={session.user} />
+          setChatList={setChatList}
+          setActiveChat={setActiveChat}
+          onLogout={handleLogout}
+          user={session.user}
+        />
+      </div>
+      
+      {/* Main Content */}
+      <main className={`flex-1 flex flex-col min-w-0 ${isMobile ? 'w-full' : ''}`}>
+        {/* Mobile Header with Menu Button */}
+        {isMobile && (
+          <header className="flex items-center gap-3 p-4 border-b border-gray-700 bg-gray-800">
+            <button
+              onClick={() => setShowMobileSidebar(true)}
+              className="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-lg transition-colors"
+              title="Open menu"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
+            <h1 className="text-lg font-semibold">AI.HQ</h1>
+          </header>
+        )}
+        
+        {/* Chat Component */}
+        <div className="flex-1 min-h-0">
+          <ChatComponent 
+            key={activeChat?._id || 'new'} 
+            activeChat={activeChat} 
+            setActiveChat={setActiveChat} 
+            setChatList={setChatList} 
+            user={userPreferences} 
+          />
+        </div>
       </main>
     </div>
   );
 }
 
-//TODO account/time based rated limit, add logic for resumeable streams when interrupted, chat sharing (export to pdf), chat branching, finalize attachments.  
+//TODO account/time based rated limit, add logic for resumeable streams when interrupted, chat sharing (export to pdf), finalize attachments.  

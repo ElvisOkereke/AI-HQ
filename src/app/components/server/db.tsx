@@ -84,7 +84,10 @@ export async function saveChatToDb(chat: Chat, user:{name?: string | null, email
     }
     const final = await db.collection('chats').updateOne(
       { "email": user.email, "chatList._id": chat._id },
-      { $set: { "chatList.$.chatHistory": chat.chatHistory} }
+      { $set: { 
+        "chatList.$.chatHistory": chat.chatHistory,
+        "chatList.$.mediaItems": chat.mediaItems
+      }}
     );
     if (!final.acknowledged) throw new Error("Error updating exisiting chat instance")
     return ("updated specific chat for user, result = "+ final.acknowledged);
@@ -107,20 +110,61 @@ export async function generateTitle(selectedModel: string, userMessage: Message)
   }
 }
 
-export async function updateChatModel(chatId: string, newModel: string, user:{name?: string | null, email?: string | null}) {
+export async function updateChatModel(chatId: any, newModel: string, user:{name?: string | null, email?: string | null}) {
   try{
     
     const db = await getDatabase();
 
-    // considering converting chatId to ObjectId if it's a string
-    const objectId = typeof chatId === 'string' ? new ObjectId(chatId) : chatId;
+    console.log('Original chatId:', chatId, 'Type:', typeof chatId);
+    
+    // Use chatId exactly as it's stored in the database
+    // Since newObjectId() creates JSON.stringify(ObjectId) and we JSON.parse() it on client,
+    // the _id should be stored as the parsed object format
+    let queryId = chatId;
+    
+    console.log('Using chatId as received:', queryId);
 
+    console.log('Attempting to update with queryId:', queryId, 'Type:', typeof queryId);
+
+    // Debug: Let's see what chat IDs actually exist for this user
+    const userChats = await db.collection('chats').findOne(
+      { "email": user.email },
+      { projection: { "chatList._id": 1 } }
+    );
+    
+    if (userChats && userChats.chatList) {
+      console.log('Existing chat IDs for user:', userChats.chatList.map((c: any) => ({ 
+        id: c._id, 
+        type: typeof c._id,
+        stringified: JSON.stringify(c._id)
+      })));
+    }
+
+    console.log('Query being executed:', {
+      email: user.email,
+      'chatList._id': queryId
+    });
+    
     const result = await db.collection('chats').updateOne(
-      { "email": user.email, "chatList._id": chatId },
+      { "email": user.email, "chatList._id": queryId },
       { $set: { "chatList.$.model": newModel} }
     );
+    
+    console.log('Update result:', {
+      acknowledged: result.acknowledged,
+      matchedCount: result.matchedCount,
+      modifiedCount: result.modifiedCount,
+      upsertedCount: result.upsertedCount
+    });
+    
     if (result.matchedCount === 0) {
       console.warn('No chat found with ID:', chatId, 'for user:', user.email);
+      // Let's also try a simpler query to see if we can find the document
+      const simpleCheck = await db.collection('chats').findOne(
+        { "email": user.email },
+        { projection: { "chatList": { $elemMatch: { "_id": queryId } } } }
+      );
+      console.log('Simple check result:', simpleCheck);
       throw new Error(`No chat found with ID: ${chatId} for user: ${user.email}`);
     }
     if (result.modifiedCount === 0) {
@@ -140,40 +184,39 @@ export async function updateChatModel(chatId: string, newModel: string, user:{na
 export async function sendMessageToGemeni(selectedModel: string, chat: Chat) {
   const chatHistory = chat.chatHistory;
   const streamable = createStreamableValue("");
-    // Efficiently partition attachments into those matching the last message and the rest
-    const lastMessage = chat.chatHistory[chat.chatHistory.length - 1];
-    const attachments = chat.attachments || [];
-    
-    const [inlineData, previousInlineData] = attachments.reduce<[any[], any[]]>(
-      ([match, rest], att) => {
-        if (lastMessage && att.id === lastMessage.id) {
-            match.push({
-            inlineData: {
-              mimeType: att.fileType,
-              data: String(att.fileData),
-            },
-            });
-        } else {
-          rest.push({
-            inlineData: {
-              mimeType: att.fileType,
-              data: String(att.fileData),
-            },
-          });
-        }
-        return [match, rest];
-      },
-      [[], []]
-    );
-    const allInlineData = [...inlineData, ...previousInlineData];
-    console.log(allInlineData);
+  
+  // Get media items for the last message and previous context
+  const lastMessage = chat.chatHistory[chat.chatHistory.length - 1];
+  const mediaItems = chat.mediaItems || [];
+  
+  // Separate current message media from previous context media
+  const currentMessageMedia = mediaItems.filter(media => media.messageId === lastMessage.id);
+  const previousContextMedia = mediaItems.filter(media => media.messageId !== lastMessage.id);
+  
+  // Convert to inline data format
+  const currentInlineData = currentMessageMedia.map(media => ({
+    inlineData: {
+      mimeType: media.fileType,
+      data: media.fileData,
+    },
+  }));
+  
+  const previousInlineData = previousContextMedia.map(media => ({
+    inlineData: {
+      mimeType: media.fileType,
+      data: media.fileData,
+    },
+  }));
+  
+  const allInlineData = [...currentInlineData, ...previousInlineData];
+  console.log(`Sending ${currentInlineData.length} current media items and ${previousInlineData.length} context media items`);
     // Start the streaming process immediately without awaiting
     (async () => {
       try {
         const ai = new GoogleGenAI({ apiKey: process.env.GOOGLE_API_KEY as string });
         const response = await ai.models.generateContentStream({
           model: selectedModel,
-          contents: createUserContent(["This is the context of user and ai assistant conversation." + JSON.stringify(chatHistory) + " the first " + inlineData.length + " inline data elements are new attachments from the most recent message, the other " + previousInlineData.length + " are previous attachments." +
+          contents: createUserContent(["This is the context of user and ai assistant conversation." + JSON.stringify(chatHistory) + " the first " + currentInlineData.length + " inline data elements are new attachments from the most recent message, the other " + previousInlineData.length + " are previous attachments." +
             "(when the user is referencing the attachments in the prompt of the most recent message, they are likely to refering to the new set of attachments, if there are no attachments in the first set and the user tries to reference new attachments remind the user that they did not attach new data," +
             "for example, user asks what is this? when there are no new attachments.)" + " Continue the conversation with the user by answering the most recent message, user may refer to older attachments so carefully read context to understand " +
             "what the user is refering to.", ...allInlineData])
@@ -202,30 +245,30 @@ export async function sendMessageToGemeniImage(selectedModel: string, chat: Chat
   const streamableIMG = createStreamableValue("");
   
   try {
+    // Get media items for the last message and previous context
     const lastMessage = chat.chatHistory[chat.chatHistory.length - 1];
-    const attachments = chat.attachments || [];
-    const [inlineData, previousInlineData] = attachments.reduce<[any[], any[]]>(
-      ([match, rest], att) => {
-        if (lastMessage && att.id === lastMessage.id) {
-          match.push({
-            inlineData: {
-              mimeType: att.fileType,
-              data: att.fileData,
-            },
-          });
-        } else {
-          rest.push({
-            inlineData: {
-              mimeType: att.fileType,
-              data: att.fileData,
-            },
-          });
-        }
-        return [match, rest];
+    const mediaItems = chat.mediaItems || [];
+    
+    // Separate current message media from previous context media
+    const currentMessageMedia = mediaItems.filter(media => media.messageId === lastMessage.id);
+    const previousContextMedia = mediaItems.filter(media => media.messageId !== lastMessage.id);
+    
+    // Convert to inline data format
+    const currentInlineData = currentMessageMedia.map(media => ({
+      inlineData: {
+        mimeType: media.fileType,
+        data: media.fileData,
       },
-      [[], []]
-    );
-    const allInlineData = [...inlineData, ...previousInlineData];
+    }));
+    
+    const previousInlineData = previousContextMedia.map(media => ({
+      inlineData: {
+        mimeType: media.fileType,
+        data: media.fileData,
+      },
+    }));
+    
+    const allInlineData = [...currentInlineData, ...previousInlineData];
 
     // Start the async process without awaiting
     (async () => {
@@ -234,7 +277,7 @@ export async function sendMessageToGemeniImage(selectedModel: string, chat: Chat
         const response = await ai.models.generateContent({
           model: selectedModel,
           contents: createUserContent([
-            "This is the context of user and ai assistant conversation." + JSON.stringify(chatHistory) + " the first " + inlineData.length + " inline data elements are new attachments from the most recent message, the other " + previousInlineData.length + " are previous attachments." +
+            "This is the context of user and ai assistant conversation." + JSON.stringify(chatHistory) + " the first " + currentInlineData.length + " inline data elements are new attachments from the most recent message, the other " + previousInlineData.length + " are previous attachments." +
             "(when the user is referencing the attachments in the prompt of the most recent message, they are likely to refering to the new set of attachments, if there are no attachments in the first set and the user tries to reference new attachments remind the user that they did not attach new data," +
             "for example, user asks what is this? when there are no new attachments.)" +
             " Continue the conversation with the user by answering the most recent message, user may refer to older attachments so carefully read context to understand what the user is refering to. (You are a image model so make sure you output images if user asks and cross context from previous prompts unless the user specifically says so)",
@@ -316,7 +359,18 @@ export async function createUser(formData: string) {
       //console.warn('Email already exists:', JSON.parse(formData).email);
       throw new Error('Account with this email already exists');
     }
-    const result = await db.collection('users').insertOne(JSON.parse(formData));
+    
+    // Add default user properties
+    const userData = {
+      ...JSON.parse(formData),
+      lastSeenUpdate: null,
+      preferences: {
+        loggingEnabled: false
+      },
+      createdAt: new Date()
+    };
+    
+    const result = await db.collection('users').insertOne(userData);
 
     if (result.acknowledged) return result.insertedId;
     else throw new Error ('Failed to create user');
@@ -324,6 +378,74 @@ export async function createUser(formData: string) {
   }catch(error){
     console.error('Error creating user or connecting to DB:', error);
     throw error;
+  }
+}
+
+export async function updateUserLastSeenUpdate(email: string, updateVersion: string) {
+  try {
+    const db = await getDatabase();
+    const result = await db.collection('users').updateOne(
+      { "email": email },
+      { $set: { "lastSeenUpdate": updateVersion, "updatedAt": new Date() } }
+    );
+    
+    if (result.matchedCount === 0) {
+      throw new Error(`User not found: ${email}`);
+    }
+    
+    if (result.acknowledged) {
+      return { success: true, modified: result.modifiedCount > 0 };
+    }
+    
+    throw new Error("Failed to update user's last seen update");
+  } catch (error) {
+    console.error('Error updating user last seen update:', error);
+    throw new Error(error instanceof Error ? error.message : String(error));
+  }
+}
+
+export async function getUserPreferences(email: string) {
+  try {
+    const db = await getDatabase();
+    const user = await db.collection('users').findOne(
+      { "email": email },
+      { projection: { "lastSeenUpdate": 1, "preferences": 1, "_id": 0 } }
+    );
+    
+    if (!user) {
+      throw new Error(`User not found: ${email}`);
+    }
+    
+    return {
+      lastSeenUpdate: user.lastSeenUpdate || null,
+      preferences: user.preferences || { loggingEnabled: false }
+    };
+  } catch (error) {
+    console.error('Error getting user preferences:', error);
+    throw new Error(error instanceof Error ? error.message : String(error));
+  }
+}
+
+export async function updateUserPreferences(email: string, preferences: any) {
+  try {
+    const db = await getDatabase();
+    const result = await db.collection('users').updateOne(
+      { "email": email },
+      { $set: { "preferences": preferences, "updatedAt": new Date() } }
+    );
+    
+    if (result.matchedCount === 0) {
+      throw new Error(`User not found: ${email}`);
+    }
+    
+    if (result.acknowledged) {
+      return { success: true, modified: result.modifiedCount > 0 };
+    }
+    
+    throw new Error("Failed to update user preferences");
+  } catch (error) {
+    console.error('Error updating user preferences:', error);
+    throw new Error(error instanceof Error ? error.message : String(error));
   }
 }
 

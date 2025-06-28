@@ -1,5 +1,5 @@
 'use client';
-import React from 'react'
+import React, { Ref } from 'react'
 import { useState, useRef, useEffect } from 'react';
 import { Copy, Check, MoreHorizontal, RefreshCw, GitBranch, Download, Edit, Trash2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -431,117 +431,6 @@ export function MessageContent({ content }: { content: string }) {
           )}
         </div>
       ))}
-    </div>
-  );
-}
-
-export function MessageMenu({ 
-  message, 
-  onCopy, 
-  onRegenerate, 
-  onBranch, 
-  onDelete, 
-  onDownload, 
-  onEdit 
-}: {
-  message: Message;
-  onCopy: () => void;
-  onRegenerate?: () => void;
-  onBranch?: () => void;
-  onDelete: () => void;
-  onDownload?: () => void;
-  onEdit?: () => void;
-}) {
-  const [isHovered, setIsHovered] = useState(false);
-  const [copied, setCopied] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
-
-  const handleCopy = () => {
-    onCopy();
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
-  const isImage = /^data:image\/[a-zA-Z]+;base64,/.test(message.content);
-  const isUserMessage = message.role === 'user';
-
-  return (
-    <div 
-      className="relative" 
-      ref={menuRef}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-    >
-      <div className="opacity-0 group-hover:opacity-100 p-1 rounded-full hover:bg-gray-600 transition-all duration-200 text-gray-400 hover:text-white">
-        <MoreHorizontal className="w-4 h-4" />
-      </div>
-      
-      <AnimatePresence>
-        {isHovered && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: -10 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: -20 }}
-            className={`absolute ${isUserMessage ? 'bottom-0 right-10' : 'bottom-0 left-10'} mb-2 bg-gray-800 border border-gray-600 rounded-lg shadow-lg py-1 z-10 min-w-[140px]`}
-          >
-            <button
-              onClick={handleCopy}
-              className="w-full px-3 py-2 text-left text-sm text-gray-300 hover:bg-gray-700 hover:text-white flex items-center gap-2"
-            >
-              {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-              {copied ? 'Copied!' : 'Copy'}
-            </button>
-            
-            {isUserMessage && onEdit && (
-              <button
-                onClick={() => onEdit()}
-                className="w-full px-3 py-2 text-left text-sm text-gray-300 hover:bg-gray-700 hover:text-white flex items-center gap-2"
-              >
-                <Edit className="w-4 h-4" />
-                Edit
-              </button>
-            )}
-            
-            {!isUserMessage && onRegenerate && (
-              <button
-                onClick={() => onRegenerate()}
-                className="w-full px-3 py-2 text-left text-sm text-gray-300 hover:bg-gray-700 hover:text-white flex items-center gap-2"
-              >
-                <RefreshCw className="w-4 h-4" />
-                Regenerate
-              </button>
-            )}
-            
-            {!isUserMessage && onBranch && (
-              <button
-                onClick={() => onBranch()}
-                className="w-full px-3 py-2 text-left text-sm text-gray-300 hover:bg-gray-700 hover:text-white flex items-center gap-2"
-              >
-                <GitBranch className="w-4 h-4" />
-                Branch Chat
-              </button>
-            )}
-            
-            {isImage && onDownload && (
-              <button
-                onClick={() => onDownload()}
-                className="w-full px-3 py-2 text-left text-sm text-gray-300 hover:bg-gray-700 hover:text-white flex items-center gap-2"
-              >
-                <Download className="w-4 h-4" />
-                Download
-              </button>
-            )}
-            
-            <button
-              onClick={() => onDelete()}
-              className="w-full px-3 py-2 text-left text-sm text-red-400 hover:bg-red-500/10 hover:text-red-300 flex items-center gap-2"
-            >
-              <Trash2 className="w-4 h-4" />
-              Delete
-            </button>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </div>
   );
 }

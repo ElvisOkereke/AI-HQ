@@ -10,10 +10,13 @@ export async function createUserAction(formData: string) {
     return { success: false, error: error instanceof Error ? error.message : String(error) };
   }
 }
-export async function generateTitleAction( selectedModel: string, userMessage: Message) {
+export async function generateTitleAction(selectedModel: string, userMessage: Message) {
   try{ 
-    const user = await generateTitle( selectedModel, userMessage)
-    return { success: true, data: user}
+    const { providerRegistry } = await import('../../lib/providers/registry');
+    const { provider, actualModelId } = providerRegistry.getProviderFromModelId(selectedModel);
+    
+    const title = await providerRegistry.generateTitle(provider, actualModelId, userMessage);
+    return { success: true, data: title };
   }catch(error){
     return { success: false, error: error instanceof Error ? error.message : String(error) };
   }
@@ -21,23 +24,16 @@ export async function generateTitleAction( selectedModel: string, userMessage: M
 
 export async function sendMessageToAIAction(selectedModel: string, chat: Chat, user: { name?: string | null, email?: string | null }) {
   try {
-    let modelResponse;
-    if (selectedModel.includes('gemini')) {
-      if (selectedModel.includes('image')) {
-        modelResponse = await sendMessageToGemeniImage(selectedModel, chat);
-      } else {
-        modelResponse = await sendMessageToGemeni(selectedModel, chat);
-      }
-    } else if (selectedModel.includes('llama')) {
-      modelResponse = await sendMessageToGemeni(selectedModel, chat);
-    } else if (selectedModel.includes('deepseek')) {
-      modelResponse = await sendMessageToGemeni(selectedModel, chat);
-    } else {
-      throw new Error('Unsupported model selected');
-    }
+    const { providerRegistry } = await import('../../lib/providers/registry');
+    const { provider, actualModelId } = providerRegistry.getProviderFromModelId(selectedModel);
+    
+    console.log(`Routing model ${selectedModel} to provider ${provider} with actualModelId ${actualModelId}`);
+    
+    const modelResponse = await providerRegistry.sendMessage(provider, actualModelId, chat);
     
     return { success: true, data: modelResponse };
   } catch (error) {
+    console.error('Error in sendMessageToAIAction:', error);
     return { success: false, error: error instanceof Error ? error.message : String(error) };
   }
 }
@@ -80,6 +76,28 @@ export async function updateChatModelAction(chatId: any, newModel: string, user:
     return { success: true, data: { chatId, newModel } };
   } catch (error) {
     console.error('Error updating chat model:', error);
+    return { success: false, error: error instanceof Error ? error.message : String(error) };
+  }
+}
+
+export async function updateUserLastSeenUpdateAction(email: string, updateVersion: string) {
+  try {
+    const { updateUserLastSeenUpdate } = await import('../server/db');
+    const result = await updateUserLastSeenUpdate(email, updateVersion);
+    return { success: true, data: result };
+  } catch (error) {
+    console.error('Error updating user last seen update:', error);
+    return { success: false, error: error instanceof Error ? error.message : String(error) };
+  }
+}
+
+export async function getUserPreferencesAction(email: string) {
+  try {
+    const { getUserPreferences } = await import('../server/db');
+    const result = await getUserPreferences(email);
+    return { success: true, data: result };
+  } catch (error) {
+    console.error('Error getting user preferences:', error);
     return { success: false, error: error instanceof Error ? error.message : String(error) };
   }
 }
