@@ -1,5 +1,5 @@
 import 'server-only';
-import { GoogleGenAI, createUserContent, Modality } from "@google/genai";
+import { GoogleGenAI, createUserContent, Modality, Tool } from "@google/genai";
 import { createStreamableValue } from 'ai/rsc';
 import { Chat, Message, MediaItem } from '../../types/types';
 import { ModelProvider, formatChatHistory, getContextMedia, getCurrentMedia } from './index';
@@ -67,11 +67,30 @@ export class GoogleProvider implements ModelProvider {
             }
           }
         } else {
-          // Use text/multimodal model with streaming
-          const response = await this.client.models.generateContentStream({
+          // Check if this is a model that supports Google Search grounding
+          const supportsGrounding = modelId === 'gemini-2.5-flash-lite-preview-06-17' || modelId === 'gemini-2.5-flash';
+          
+          let requestData: any = {
             model: modelId,
             contents: createUserContent([contextMessage, ...allInlineData])
-          });
+          };
+
+          const groundingTool = {
+            googleSearch: {},
+          };
+
+          // Configure generation settings
+          const config = {
+            tools: [groundingTool],
+          };
+          
+          // Add Google Search grounding for supported models
+          if (supportsGrounding) {
+            requestData = { ...requestData, config}
+          }
+          
+          // Use text/multimodal model with streaming
+          const response = await this.client.models.generateContentStream(requestData);
 
           for await (const chunk of response) {
             const text = chunk.text as string;

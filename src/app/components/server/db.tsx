@@ -181,7 +181,7 @@ export async function updateChatModel(chatId: any, newModel: string, user:{name?
 
 }
 
-export async function sendMessageToGemeni(selectedModel: string, chat: Chat) {
+export async function sendMessageToGemeni(selectedModel: string, chat: Chat) { //DEPRECATED
   const chatHistory = chat.chatHistory;
   const streamable = createStreamableValue("");
   
@@ -214,13 +214,31 @@ export async function sendMessageToGemeni(selectedModel: string, chat: Chat) {
     (async () => {
       try {
         const ai = new GoogleGenAI({ apiKey: process.env.GOOGLE_API_KEY as string });
-        const response = await ai.models.generateContentStream({
+        
+        // Check if this is a model that supports Google Search grounding
+        const supportsGrounding = selectedModel === 'gemini-2.5-flash-lite-preview-06-17' || selectedModel === 'gemini-2.5-flash';
+        
+        let requestConfig: any = {
           model: selectedModel,
           contents: createUserContent(["This is the context of user and ai assistant conversation." + JSON.stringify(chatHistory) + " the first " + currentInlineData.length + " inline data elements are new attachments from the most recent message, the other " + previousInlineData.length + " are previous attachments." +
             "(when the user is referencing the attachments in the prompt of the most recent message, they are likely to refering to the new set of attachments, if there are no attachments in the first set and the user tries to reference new attachments remind the user that they did not attach new data," +
             "for example, user asks what is this? when there are no new attachments.)" + " Continue the conversation with the user by answering the most recent message, user may refer to older attachments so carefully read context to understand " +
             "what the user is refering to.", ...allInlineData])
-        });
+        };
+        
+        // Add Google Search grounding for supported models
+        if (supportsGrounding) {
+          requestConfig.tools = [{
+            googleSearchRetrieval: {
+              dynamicRetrievalConfig: {
+                mode: 'MODE_DYNAMIC',
+                dynamicThreshold: 0.7
+              }
+            }
+          }];
+        }
+        
+        const response = await ai.models.generateContentStream(requestConfig);
         
         for await (const chunk of response) {
           const text = chunk.text as string;
@@ -239,7 +257,7 @@ export async function sendMessageToGemeni(selectedModel: string, chat: Chat) {
   
 }
 
-export async function sendMessageToGemeniImage(selectedModel: string, chat: Chat) {
+export async function sendMessageToGemeniImage(selectedModel: string, chat: Chat) { //DEPRECATED
   const chatHistory = chat.chatHistory;
   const streamable = createStreamableValue("");
   const streamableIMG = createStreamableValue("");

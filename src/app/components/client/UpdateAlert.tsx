@@ -6,43 +6,39 @@ import { updateUserLastSeenUpdateAction } from '../actions/dbActions';
 import { User } from '../../types/types';
 
 // Define the current app version or update ID
-const CURRENT_UPDATE_VERSION = '2025-06-27-v1'; // Update this when you have new features
+const CURRENT_UPDATE_VERSION = '2025-07-01-v1'; // Update this when you have new features
 
 // Define the update content
 const UPDATE_CONTENT = {
   version: CURRENT_UPDATE_VERSION,
-  title: 'New Features Available! 🎉',
+  title: 'Google Search Grounding Now Available! 🔍',
   features: [
     {
-      icon: '🔄',
-      title: 'Fresh Start',
-      description: 'All Chats have been cleared due to architecture refactor'
+      icon: '🔍',
+      title: 'Google Search Grounding',
+      description: 'Gemini 2.5 Flash now has real-time Google Search access for up-to-date information'
     },
     {
-      icon: '🔧',
-      title: 'Advanced Logging System',
-      description: 'Toggle detailed logging for debugging and development'
+      icon: '🌐',
+      title: 'Real-time Information',
+      description: 'Get current news, facts, and data directly integrated into AI responses'
     },
     {
-      icon: '📱',
-      title: 'Enhanced Mobile Experience',
-      description: 'Fully responsive design optimized for mobile devices'
+      icon: '⚡',
+      title: 'Enhanced Accuracy',
+      description: 'AI responses now include verified, current information from Google Search'
     },
     {
-      icon: '🔔',
-      title: 'Update Notifications',
-      description: 'Stay informed about new features and improvements'
-    },
-    {
-      icon: '⚠',
-      title: 'Attachments are broken currently',
-      description: 'They have been disabled'
+      icon: '🎯',
+      title: 'Smart Context',
+      description: 'AI automatically determines when to search for additional information'
     }
   ],
   improvements: [
-    'Better sidebar responsiveness on mobile',
-    'Improved chat layout for smaller screens',
-    'Enhanced user experience across all devices'
+    'Gemini 2.5 Flash Preview now supports Google Search grounding',
+    'Dynamic search threshold for optimal performance',
+    'Seamless integration of web search results into conversations',
+    'More accurate and up-to-date responses'
   ]
 };
 

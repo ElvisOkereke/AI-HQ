@@ -39,7 +39,7 @@ export const llmModels: LLMModel[] = [
       streaming: true,
       maxTokens: 8192
     },
-    description: 'Experimental preview with enhanced speed and performance',
+    description: 'Enhanced preview with Google Search grounding for real-time information and current data',
     provider: 'Google',
     category: 'multimodal',
     contextLength: 1000000,
