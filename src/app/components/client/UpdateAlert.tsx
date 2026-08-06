@@ -4,6 +4,7 @@ import { X, Sparkles, CheckCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { updateUserLastSeenUpdateAction } from '../actions/dbActions';
 import { User } from '../../types/types';
+import { logger } from '../../utils/logger';
 
 // Define the current app version or update ID
 const CURRENT_UPDATE_VERSION = '2025-07-01-v1'; // Update this when you have new features
@@ -68,7 +69,7 @@ export default function UpdateAlert({ user, onDismiss }: UpdateAlertProps) {
         onDismiss?.();
       }
     } catch (error) {
-      console.error('Failed to update last seen update:', error);
+      logger.error('Failed to update last seen update:', error);
     } finally {
       setIsLoading(false);
     }

@@ -40,8 +40,8 @@ const tokenize = (code: string, language?: string): Array<{ token: string; type:
     variable: /\b[a-zA-Z_][a-zA-Z0-9_]*\b/g, // Catch-all for identifiers (needs careful ordering)
   };
 
-  let tokens: Array<{ token: string; type: keyof typeof monokaiColors }> = [];
-  let lastIndex = 0;
+  const tokens: Array<{ token: string; type: keyof typeof monokaiColors }> = [];
+  const lastIndex = 0;
   let match;
 
   // A more robust tokenizer would iterate through patterns, applying them sequentially
@@ -71,7 +71,7 @@ const tokenize = (code: string, language?: string): Array<{ token: string; type:
   identifiedTokens.sort((a, b) => a.index - b.index);
 
   // Build the final token list, handling overlaps and ensuring all code is covered
-  let processedCode = code;
+  const processedCode = code;
   let currentPos = 0;
   
   for (const tokenInfo of identifiedTokens) {

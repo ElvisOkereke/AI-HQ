@@ -1,7 +1,6 @@
 //'use client'
 import NextAuth from 'next-auth'
 import GithubProvider from 'next-auth/providers/github'
-import GoogleProvider from 'next-auth/providers/google'
 import CredentialsProvider from 'next-auth/providers/credentials'
 import { verifyPass, createOrUpdateOAuthUser } from '@/app/components/server/db'
 
@@ -51,8 +50,8 @@ const handler = NextAuth({
   callbacks: {
     async signIn({ user, account, profile }) {
       try {
-        // For OAuth providers (GitHub, Google, etc.), create/update user in database
-        if (account?.provider === 'github' || account?.provider === 'google') {
+        // For OAuth providers (GitHub, etc.), create/update user in database
+        if (account?.provider === 'github') {
           if (user.email) {
             const result = await createOrUpdateOAuthUser(
               user.email,
@@ -91,7 +90,7 @@ const handler = NextAuth({
         return session;
       } catch (error) {
         console.error("Session callback error:", error);
-        throw error;
+        return session;
       }
     },
     async jwt({ token, user }) {

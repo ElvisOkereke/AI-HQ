@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Copy, Check, MoreHorizontal, RefreshCw, GitBranch, Download, Edit, Trash2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Message} from "../../types/types"
+import { logger } from '../../utils/logger';
 
 
 // Syntax highlighting utility - returns React elements instead of HTML strings
@@ -186,7 +187,7 @@ export function CodeBlock({ code, language }: { code: string; language?: string 
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch (err) {
-      console.error('Failed to copy code:', err);
+      logger.error('Failed to copy code:', err);
     }
   };
 

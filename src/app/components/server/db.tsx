@@ -1,8 +1,8 @@
 import 'server-only'
+import bcrypt from 'bcrypt';
 import { MongoClient, ServerApiVersion, ObjectId } from 'mongodb';
 import { GoogleGenAI, createUserContent, Modality } from "@google/genai";
 import { createStreamableValue } from 'ai/rsc'
-//import argon2 from 'argon2';
 import { Chat, Message } from "../../types/types"
 
 declare global {
@@ -14,7 +14,7 @@ let clientPromise: Promise<MongoClient> | null = null;
 
 
 if (!global._mongoClientPromise) {
-  client = new MongoClient(process.env.NEXT_PUBLIC_MONGODB_URI as string, {
+  client = new MongoClient(process.env.MONGODB_URI as string, {
   maxPoolSize: 10,
   serverSelectionTimeoutMS: 5000,
   socketTimeoutMS: 45000,
@@ -120,7 +120,7 @@ export async function updateChatModel(chatId: any, newModel: string, user:{name?
     // Use chatId exactly as it's stored in the database
     // Since newObjectId() creates JSON.stringify(ObjectId) and we JSON.parse() it on client,
     // the _id should be stored as the parsed object format
-    let queryId = chatId;
+    const queryId = chatId;
     
     console.log('Using chatId as received:', queryId);
 
@@ -218,7 +218,7 @@ export async function sendMessageToGemeni(selectedModel: string, chat: Chat) { /
         // Check if this is a model that supports Google Search grounding
         const supportsGrounding = selectedModel === 'gemini-2.5-flash-lite-preview-06-17' || selectedModel === 'gemini-2.5-flash';
         
-        let requestConfig: any = {
+        const requestConfig: any = {
           model: selectedModel,
           contents: createUserContent(["This is the context of user and ai assistant conversation." + JSON.stringify(chatHistory) + " the first " + currentInlineData.length + " inline data elements are new attachments from the most recent message, the other " + previousInlineData.length + " are previous attachments." +
             "(when the user is referencing the attachments in the prompt of the most recent message, they are likely to refering to the new set of attachments, if there are no attachments in the first set and the user tries to reference new attachments remind the user that they did not attach new data," +
@@ -353,14 +353,13 @@ export async function verifyPass(credentials: { email?: string, password?: strin
           const db = await getDatabase();
           const res = await db.collection('users').findOne({ "email": credentials.email });
           if (res !== null) {
-              // Verifying
-              //const isValid = await argon2.verify(res.password, credentials?.password);
-              if (res.password === credentials.password) return {
+              const isValid = await bcrypt.compare(credentials.password, res.password);
+              if (isValid) return {
                 id: res._id.toString(),
                 email: res.email,
                 name: res.name,
               }
-              else throw new Error('Invalid password'); 
+              else throw new Error('Invalid password');
             }; throw new Error('Account not found (User/Email is case sensitive)');
         }catch(error){
           console.error('Error connect to db or querying user:', error);
@@ -378,9 +377,13 @@ export async function createUser(formData: string) {
       throw new Error('Account with this email already exists');
     }
     
+    const parsedData = JSON.parse(formData);
+    const hashedPassword = await bcrypt.hash(parsedData.password, 12);
+
     // Add default user properties
     const userData = {
-      ...JSON.parse(formData),
+      ...parsedData,
+      password: hashedPassword,
       lastSeenUpdate: null,
       preferences: {
         loggingEnabled: false

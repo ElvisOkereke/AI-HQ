@@ -1,6 +1,22 @@
 'use server';
 import { createUser, sendMessageToGemeni, fetchChatsByUser, saveChatToDb, newObjectId, generateTitle, updateChatModel, sendMessageToGemeniImage} from '../server/db';
 import { Chat, SidebarProps, Attachment, Message } from "../../types/types"
+import { headers } from 'next/headers';
+import { checkGuestRateLimit } from '../../lib/rateLimiter';
+
+// Guests are locked to this model server-side regardless of what the client
+// sends, both to control AI provider cost and as defense in depth against
+// someone calling the action directly with a different model id.
+const GUEST_MODEL_ID = 'gemini-2.0-flash';
+
+async function enforceGuestRateLimit() {
+  const headersList = await headers();
+  const ip = headersList.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
+  const { allowed } = checkGuestRateLimit(ip);
+  if (!allowed) {
+    throw new Error('Guest rate limit reached. Please sign up for unlimited access.');
+  }
+}
 
 export async function createUserAction(formData: string) {
   try{ 
@@ -10,11 +26,16 @@ export async function createUserAction(formData: string) {
     return { success: false, error: error instanceof Error ? error.message : String(error) };
   }
 }
-export async function generateTitleAction(selectedModel: string, userMessage: Message) {
-  try{ 
+export async function generateTitleAction(selectedModel: string, userMessage: Message, user?: { isGuest?: boolean }) {
+  try{
+    if (user?.isGuest) {
+      await enforceGuestRateLimit();
+      selectedModel = GUEST_MODEL_ID;
+    }
+
     const { providerRegistry } = await import('../../lib/providers/registry');
     const { provider, actualModelId } = providerRegistry.getProviderFromModelId(selectedModel);
-    
+
     const title = await providerRegistry.generateTitle(provider, actualModelId, userMessage);
     return { success: true, data: title };
   }catch(error){
@@ -22,15 +43,20 @@ export async function generateTitleAction(selectedModel: string, userMessage: Me
   }
 }
 
-export async function sendMessageToAIAction(selectedModel: string, chat: Chat, user: { name?: string | null, email?: string | null }) {
+export async function sendMessageToAIAction(selectedModel: string, chat: Chat, user: { name?: string | null, email?: string | null, isGuest?: boolean }) {
   try {
+    if (user?.isGuest) {
+      await enforceGuestRateLimit();
+      selectedModel = GUEST_MODEL_ID;
+    }
+
     const { providerRegistry } = await import('../../lib/providers/registry');
     const { provider, actualModelId } = providerRegistry.getProviderFromModelId(selectedModel);
-    
+
     console.log(`Routing model ${selectedModel} to provider ${provider} with actualModelId ${actualModelId}`);
-    
+
     const modelResponse = await providerRegistry.sendMessage(provider, actualModelId, chat);
-    
+
     return { success: true, data: modelResponse };
   } catch (error) {
     console.error('Error in sendMessageToAIAction:', error);

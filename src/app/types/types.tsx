@@ -48,6 +48,7 @@ export type User = {
   preferences?: {
     loggingEnabled?: boolean;
   };
+  isGuest?: boolean;
 };
 
 export type ChatProps = {
@@ -67,6 +68,7 @@ export type SidebarProps = {
   user?: {
     name?: string | null;
     email?: string | null;
+    isGuest?: boolean;
   };
 };
 export type ModelFeatures = {

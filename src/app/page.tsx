@@ -22,7 +22,11 @@ export default function HomePage() {
   const [userPreferences, setUserPreferences] = useState<User>({});
   const [showMobileSidebar, setShowMobileSidebar] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [isGuestMode, setIsGuestMode] = useState(false);
   const router = useRouter();
+
+  const guestUser: User = { name: 'Guest', email: 'guest@local', isGuest: true };
+  const effectiveUser = isGuestMode ? guestUser : userPreferences;
   
   // Check screen size for mobile responsiveness
   useEffect(() => {
@@ -124,8 +128,16 @@ export default function HomePage() {
     }
   }, [session?.user?.email]);
 
-  // Handle logout using NextAuth
-  const handleLogout = () => signOut();
+  // Handle logout using NextAuth (or just exit guest mode, which never had a real session)
+  const handleLogout = () => {
+    if (isGuestMode) {
+      setIsGuestMode(false);
+      setActiveChat(undefined);
+      setChatList([]);
+      return;
+    }
+    signOut();
+  };
 
   // Show loading state while checking authentication
   if (status === "loading") {
@@ -161,15 +173,23 @@ export default function HomePage() {
       )
   }
 
-  // Show login page if not authenticated
-  if (!session) {
+  // Show login page if not authenticated and not in guest mode
+  if (!session && !isGuestMode) {
     return (
       <div className="flex flex-col items-center justify-center h-screen bg-gray-900 text-white font-sans">
         <div className="text-center w-full max-w-sm">
           <Building2 className="w-24 h-24 text-purple-400 mx-auto mb-6" />
           <h1 className="text-4xl font-bold mb-2">Welcome to AI.HQ</h1>
           <p className="text-gray-400 mb-8">Sign in to begin your conversation with the future of AI.</p>
-          
+
+          {/* Guest mode - try instantly, no signup */}
+          <button
+            onClick={() => setIsGuestMode(true)}
+            className="w-full mb-6 px-6 py-3 bg-gradient-to-r from-purple-500 to-blue-500 rounded-lg font-semibold hover:opacity-90 transition-opacity"
+          >
+            Try as Guest — no signup required
+          </button>
+
           {/* OAuth Sign-in buttons */}
           <div className="flex flex-col gap-3 mb-6">
             <button
@@ -181,20 +201,6 @@ export default function HomePage() {
               </svg>
               Continue with GitHub
             </button>
-            {/*<button
-              onClick={() => signIn('google')}
-              className="flex items-center justify-center gap-2 px-6 py-3 bg-gray-800 rounded-lg font-semibold hover:bg-gray-700 transition-colors"
-            >
-              <svg className="w-5 h-5" viewBox="0 0 48 48">
-                <g>
-                  <path fill="#4285F4" d="M24 9.5c3.54 0 6.7 1.22 9.19 3.23l6.85-6.85C36.68 2.49 30.74 0 24 0 14.82 0 6.71 5.48 2.69 13.44l7.98 6.2C12.38 13.02 17.74 9.5 24 9.5z"/>
-                  <path fill="#34A853" d="M46.1 24.55c0-1.64-.15-3.22-.42-4.74H24v9.01h12.42c-.54 2.9-2.18 5.36-4.65 7.02l7.19 5.6C43.98 37.05 46.1 31.37 46.1 24.55z"/>
-                  <path fill="#FBBC05" d="M10.67 28.64A14.5 14.5 0 0 1 9.5 24c0-1.62.28-3.18.77-4.64l-7.98-6.2A23.96 23.96 0 0 0 0 24c0 3.81.91 7.41 2.53 10.56l8.14-5.92z"/>
-                  <path fill="#EA4335" d="M24 48c6.48 0 11.93-2.15 15.9-5.85l-7.19-5.6c-2 1.34-4.56 2.15-8.71 2.15-6.26 0-11.62-3.52-14.33-8.64l-8.14 5.92C6.71 42.52 14.82 48 24 48z"/>
-                </g>
-              </svg>
-              Continue with Google
-            </button>*/}
           </div>
 
           {/* Alternative: Credentials sign-in */}
@@ -219,12 +225,12 @@ export default function HomePage() {
     );
   }
 
-  // Show main app if authenticated
+  // Show main app if authenticated (or in guest mode)
   return (
     <div className="flex h-screen bg-gray-900 text-white font-sans overflow-hidden">
       {/* Update Alert */}
       {userPreferences.email && (
-        <UpdateAlert 
+        <UpdateAlert
           user={userPreferences}
           onDismiss={() => {
             // Refresh user preferences to hide the alert
@@ -235,34 +241,41 @@ export default function HomePage() {
           }}
         />
       )}
-      
+
       {/* Mobile Sidebar Backdrop */}
       {isMobile && showMobileSidebar && (
-        <div 
+        <div
           className="fixed inset-0 bg-black/50 z-40"
           onClick={() => setShowMobileSidebar(false)}
         />
       )}
-      
+
       {/* Sidebar */}
-      <div className={`${isMobile ? 
+      <div className={`${isMobile ?
         `fixed left-0 top-0 h-full z-50 transform transition-transform duration-300 ${
           showMobileSidebar ? 'translate-x-0' : '-translate-x-full'
-        }` : 
+        }` :
         ''
       }`}>
-        <Sidebar 
+        <Sidebar
           chatList={chatList}
-          activeChat={activeChat} 
+          activeChat={activeChat}
           setChatList={setChatList}
           setActiveChat={setActiveChat}
           onLogout={handleLogout}
-          user={session.user}
+          user={effectiveUser}
         />
       </div>
-      
+
       {/* Main Content */}
       <main className={`flex-1 flex flex-col min-w-0 ${isMobile ? 'w-full' : ''}`}>
+        {/* Guest mode banner */}
+        {isGuestMode && (
+          <div className="flex items-center justify-center gap-2 px-4 py-2 bg-purple-900/40 border-b border-purple-700 text-sm text-purple-200 text-center">
+            <span>Guest mode — chats aren&apos;t saved and the model is locked. Sign up to keep your history and unlock all models.</span>
+          </div>
+        )}
+
         {/* Mobile Header with Menu Button */}
         {isMobile && (
           <header className="flex items-center gap-3 p-4 border-b border-gray-700 bg-gray-800">
@@ -276,15 +289,15 @@ export default function HomePage() {
             <h1 className="text-lg font-semibold">AI.HQ</h1>
           </header>
         )}
-        
+
         {/* Chat Component */}
         <div className="flex-1 min-h-0">
-          <ChatComponent 
-            key={activeChat?._id || 'new'} 
-            activeChat={activeChat} 
-            setActiveChat={setActiveChat} 
-            setChatList={setChatList} 
-            user={userPreferences} 
+          <ChatComponent
+            key={activeChat?._id || 'new'}
+            activeChat={activeChat}
+            setActiveChat={setActiveChat}
+            setChatList={setChatList}
+            user={effectiveUser}
           />
         </div>
       </main>

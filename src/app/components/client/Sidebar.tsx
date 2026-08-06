@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { fetchChatsByUserAction } from '../actions/dbActions';
 import { SidebarProps } from "../../types/types"
 import DebugPanel from './DebugPanel';
+import { logger } from '../../utils/logger';
 
 export default function Sidebar({ chatList, setChatList, activeChat, setActiveChat, onLogout, user }: SidebarProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -32,11 +33,11 @@ export default function Sidebar({ chatList, setChatList, activeChat, setActiveCh
   }, [isCollapsed]);
   
   useEffect(() => {
-    if(user){// fetch only if user is logged in
+    if(user && !user.isGuest){// fetch only if user is logged in (guests have no server-side chats)
     const fetchAllChats = async () => {
       const fetchChats = await fetchChatsByUserAction(user.email as string);
       if (!fetchChats.success) {
-        console.error('Failed to fetch chats:', fetchChats.error);
+        logger.error('Failed to fetch chats:', fetchChats.error);
         throw new Error(fetchChats.error);
       }
       setChatList(fetchChats.data ?? []);

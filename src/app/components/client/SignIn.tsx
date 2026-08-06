@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { signIn } from 'next-auth/react';
 import { Building2, Mail, Lock, ArrowLeft, Eye, EyeOff } from 'lucide-react';
+import { logger } from '../../utils/logger';
 
 interface SignInFormProps {
   onBack: () => void;
@@ -31,7 +32,7 @@ export default function SignInForm({ onBack }: SignInFormProps) {
         setError(result.error);
       } else if (result?.ok) {
         // Success - user will be redirected automatically
-        console.log('Sign in successful');
+        logger.auth('Sign in successful');
         // Redirect to home page or dashboard
         window.location.reload();
       }
@@ -144,27 +145,11 @@ export default function SignInForm({ onBack }: SignInFormProps) {
             </svg>
             Continue with GitHub
           </button>
-          
-          {/*<button
-            onClick={() => signIn('google')}
-            disabled={isLoading}
-            className="flex items-center justify-center gap-2 px-6 py-3 bg-gray-800 rounded-lg font-semibold hover:bg-gray-700 transition-colors disabled:opacity-50"
-          >
-            <svg className="w-5 h-5" viewBox="0 0 48 48">
-              <g>
-                <path fill="#4285F4" d="M24 9.5c3.54 0 6.7 1.22 9.19 3.23l6.85-6.85C36.68 2.49 30.74 0 24 0 14.82 0 6.71 5.48 2.69 13.44l7.98 6.2C12.38 13.02 17.74 9.5 24 9.5z"/>
-                <path fill="#34A853" d="M46.1 24.55c0-1.64-.15-3.22-.42-4.74H24v9.01h12.42c-.54 2.9-2.18 5.36-4.65 7.02l7.19 5.6C43.98 37.05 46.1 31.37 46.1 24.55z"/>
-                <path fill="#FBBC05" d="M10.67 28.64A14.5 14.5 0 0 1 9.5 24c0-1.62.28-3.18.77-4.64l-7.98-6.2A23.96 23.96 0 0 0 0 24c0 3.81.91 7.41 2.53 10.56l8.14-5.92z"/>
-                <path fill="#EA4335" d="M24 48c6.48 0 11.93-2.15 15.9-5.85l-7.19-5.6c-2 1.34-4.56 2.15-8.71 2.15-6.26 0-11.62-3.52-14.33-8.64l-8.14 5.92C6.71 42.52 14.82 48 24 48z"/>
-              </g>
-            </svg>
-            Continue with Google
-          </button>*/}
         </div>
 
         {/* Footer */}
         <div className="mt-8 text-center text-gray-400 text-sm">
-          <p>Don't have an account? <button onClick={onBack} className="text-blue-400 hover:text-blue-300">Sign up</button></p>
+          <p>Don&apos;t have an account? <button onClick={onBack} className="text-blue-400 hover:text-blue-300">Sign up</button></p>
         </div>
       </div>
     </div>

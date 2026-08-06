@@ -3,6 +3,7 @@ import React from 'react'
 import { useState, useRef } from 'react';
 import { Paperclip, CheckCircle, Loader2 } from 'lucide-react';
 import { motion} from 'motion/react';
+import { logger } from '../../utils/logger';
 
 
 
@@ -58,7 +59,7 @@ export function FileUploadButton({ onFileUpload }: { onFileUpload: (fileData: st
         setUploading(false);
       }
     } catch (error) {
-      console.error('File upload error:', error);
+      logger.error('File upload error:', error);
       alert('Error uploading file.');
       setUploading(false);
     }
