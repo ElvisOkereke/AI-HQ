@@ -9,33 +9,35 @@ declare global {
   // eslint-disable-next-line no-var
   var _mongoClientPromise: Promise<MongoClient> | undefined;
 }
-let client;
-let clientPromise: Promise<MongoClient> | null = null;
 
-
-if (!global._mongoClientPromise) {
-  client = new MongoClient(process.env.MONGODB_URI as string, {
-  maxPoolSize: 10,
-  serverSelectionTimeoutMS: 5000,
-  socketTimeoutMS: 45000,
-  family: 4,
-  serverApi: {
-    version: ServerApiVersion.v1,
-    strict: true,
-    deprecationErrors: true,
+// Lazily create the connection on first use rather than at module load —
+// eagerly connecting at import time breaks `next build`'s page-data
+// collection step (it imports every route module without a request context)
+// whenever MONGODB_URI isn't resolvable yet.
+function getClientPromise(): Promise<MongoClient> {
+  if (!global._mongoClientPromise) {
+    const client = new MongoClient(process.env.MONGODB_URI as string, {
+      maxPoolSize: 10,
+      serverSelectionTimeoutMS: 5000,
+      socketTimeoutMS: 45000,
+      family: 4,
+      serverApi: {
+        version: ServerApiVersion.v1,
+        strict: true,
+        deprecationErrors: true,
+      }
+    });
+    global._mongoClientPromise = client.connect();
   }
-});
-  global._mongoClientPromise = client.connect();
+  return global._mongoClientPromise;
 }
-clientPromise = global._mongoClientPromise;
-export {clientPromise};
 
 // Database utility function
 export async function getDatabase(dbName = 't3chat') {
   try {
-    const client = await clientPromise;
+    const client = await getClientPromise();
     console.log('MongoDB client connected');
-    return client!.db(dbName)
+    return client.db(dbName)
   }catch (error) {
     console.error('Error connecting to the database:', error);
     throw error;
