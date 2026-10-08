@@ -13,11 +13,14 @@ type ModelDropdownProps = {
   selectedModel: LLMModel;
   onModelSelect: (model: LLMModel) => void;
   disabled?: boolean;
+  extraModels?: LLMModel[];
 };
 
-export default function ModelDropdown({ selectedModel, onModelSelect, disabled }: ModelDropdownProps) {
+export default function ModelDropdown({ selectedModel, onModelSelect, disabled, extraModels }: ModelDropdownProps) {
   const [isDropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  const allModels = extraModels?.length ? [...llmModels, ...extraModels] : llmModels;
 
   const {
     searchTerm,
@@ -31,7 +34,7 @@ export default function ModelDropdown({ selectedModel, onModelSelect, disabled }
     filteredModels,
     resetFilters,
     searchInputRef,
-  } = useModelFilter(llmModels, isDropdownOpen);
+  } = useModelFilter(allModels, isDropdownOpen);
 
   const closeDropdown = () => {
     setDropdownOpen(false);

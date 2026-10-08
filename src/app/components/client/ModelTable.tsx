@@ -43,6 +43,11 @@ export default function ModelTable({ models, selectedModel, onSelect, onClearFil
                       Experimental
                     </span>
                   )}
+                  {model.requiresByok && (
+                    <span className="inline-block px-1.5 py-0.5 text-xs bg-blue-500/20 text-blue-300 rounded mt-1 ml-1">
+                      Your API key
+                    </span>
+                  )}
                 </div>
               </div>
             </td>
@@ -71,11 +76,6 @@ export default function ModelTable({ models, selectedModel, onSelect, onClearFil
             {/* Features */}
             <td className="p-3">
               <div className="flex items-center gap-1">
-                <Tooltip content={model.features.imageGeneration ? "Can generate images" : "No image generation"}>
-                  <div>
-                    <FeatureIcon feature="imageGeneration" enabled={!!model.features.imageGeneration} />
-                  </div>
-                </Tooltip>
                 <Tooltip content={model.features.imageUpload ? "Can analyze uploaded images" : "No image upload"}>
                   <div>
                     <FeatureIcon feature="imageUpload" enabled={!!model.features.imageUpload} />

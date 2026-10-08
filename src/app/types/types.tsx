@@ -57,6 +57,7 @@ export type ChatProps = {
   user?: User;
   setActiveChat: React.Dispatch<React.SetStateAction<Chat | undefined>>;
   setChatList: React.Dispatch<React.SetStateAction<Chat[]>>;
+  extraModels?: LLMModel[];
 }
 
 export type SidebarProps = {
@@ -70,9 +71,9 @@ export type SidebarProps = {
     email?: string | null;
     isGuest?: boolean;
   };
+  onByokConnectionsChanged?: () => void;
 };
 export type ModelFeatures = {
-  imageGeneration?: boolean;
   imageUpload?: boolean;
   fileUpload?: boolean;
   webSearch?: boolean;
@@ -80,7 +81,7 @@ export type ModelFeatures = {
   maxTokens?: number;
 };
 
-export type ModelProvider = 'Google' | 'HuggingFace' | 'Nvidia' | 'OpenAI' | 'Anthropic';
+export type ModelProvider = 'Fuelix' | 'BYOK';
 
 export type LLMModel = {
   id: string;
@@ -89,9 +90,19 @@ export type LLMModel = {
   features: ModelFeatures;
   description: string;
   provider: ModelProvider;
-  category: 'text' | 'multimodal' | 'image' | 'code' | 'reasoning';
+  category: 'text' | 'multimodal' | 'code' | 'reasoning';
   contextLength?: number;
   isExperimental?: boolean;
+  requiresByok?: boolean;
+};
+
+// Client-safe metadata for a saved BYOK connection — never includes key material.
+export type BYOKConnectionMeta = {
+  id: string;
+  label: string;
+  baseUrl: string;
+  modelId: string;
+  createdAt: string;
 };
 
 

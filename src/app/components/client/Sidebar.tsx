@@ -1,15 +1,17 @@
 'use client';
-import { Plus, MessageSquare, LogOut, User, ChevronLeft, ChevronRight, Terminal } from 'lucide-react';
+import { Plus, MessageSquare, LogOut, User, ChevronLeft, ChevronRight, Terminal, KeyRound } from 'lucide-react';
 import React, { useState, useEffect } from 'react';
 import { fetchChatsByUserAction } from '../actions/dbActions';
 import { SidebarProps } from "../../types/types"
 import DebugPanel from './DebugPanel';
+import SettingsPanel from './SettingsPanel';
 import { logger } from '../../utils/logger';
 
-export default function Sidebar({ chatList, setChatList, activeChat, setActiveChat, onLogout, user }: SidebarProps) {
+export default function Sidebar({ chatList, setChatList, activeChat, setActiveChat, onLogout, user, onByokConnectionsChanged }: SidebarProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [showDebugPanel, setShowDebugPanel] = useState(false);
+  const [showSettingsPanel, setShowSettingsPanel] = useState(false);
   
   useEffect(() => {
     const checkScreenSize = () => {
@@ -154,7 +156,21 @@ export default function Sidebar({ chatList, setChatList, activeChat, setActiveCh
             </span>
           )}
         </button>
-        
+
+        {/* API Keys Button - hidden entirely for guests, they have no account to attach keys to */}
+        {!user?.isGuest && (
+          <button
+            onClick={() => setShowSettingsPanel(true)}
+            className={`flex items-center w-full p-2 rounded-lg transition-colors text-gray-400 hover:text-white hover:bg-gray-700/50 ${
+              isCollapsed ? 'justify-center' : 'gap-3'
+            }`}
+            title={isCollapsed ? "API Keys" : ""}
+          >
+            <KeyRound className="w-4 h-4" />
+            {!isCollapsed && <span className="text-sm">API Keys</span>}
+          </button>
+        )}
+
         {/* User Profile */}
         <div className={`flex items-center p-2 rounded-lg hover:bg-gray-700/50 cursor-pointer ${
           isCollapsed ? 'justify-center' : 'gap-3'
@@ -186,10 +202,21 @@ export default function Sidebar({ chatList, setChatList, activeChat, setActiveCh
       </div>
       
       {/* Debug Panel */}
-      <DebugPanel 
+      <DebugPanel
         isOpen={showDebugPanel}
         onClose={() => setShowDebugPanel(false)}
       />
+
+      {/* Settings Panel (API Keys / BYOK) - not mounted at all for guests */}
+      {!user?.isGuest && (
+        <SettingsPanel
+          isOpen={showSettingsPanel}
+          onClose={() => {
+            setShowSettingsPanel(false);
+            onByokConnectionsChanged?.();
+          }}
+        />
+      )}
     </div>
   );
 }

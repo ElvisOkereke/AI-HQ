@@ -1,9 +1,15 @@
 import 'server-only'
 import bcrypt from 'bcrypt';
+import { randomUUID } from 'crypto';
 import { MongoClient, ServerApiVersion, ObjectId } from 'mongodb';
-import { GoogleGenAI, createUserContent, Modality } from "@google/genai";
-import { createStreamableValue } from 'ai/rsc'
-import { Chat, Message } from "../../types/types"
+import { Chat, BYOKConnectionMeta } from "../../types/types"
+import { encryptSecret, decryptSecret, EncryptedSecret } from '../../lib/security/encryption';
+
+const MAX_BYOK_CONNECTIONS = 10;
+
+type StoredByokConnection = BYOKConnectionMeta & {
+  encryptedApiKey: EncryptedSecret;
+};
 
 declare global {
   // eslint-disable-next-line no-var
@@ -99,19 +105,6 @@ export async function saveChatToDb(chat: Chat, user:{name?: string | null, email
   }
 
 }
-export async function generateTitle(selectedModel: string, userMessage: Message){
-  try{
-      const ai = new GoogleGenAI({ apiKey: process.env.GOOGLE_API_KEY as string });
-      const response = await ai.models.generateContent({
-      model: `gemini-2.0-flash`,
-      contents: "Using this initial user message " + userMessage.content + "output a singular title for this User to AI chat instance, ONLY RESPOND WITH TITLE"
-      });
-      return response.text
-    }catch(error){
-      throw new Error(error instanceof Error ? error.message : String(error))
-  }
-}
-
 export async function updateChatModel(chatId: any, newModel: string, user:{name?: string | null, email?: string | null}) {
   try{
     
@@ -181,171 +174,6 @@ export async function updateChatModel(chatId: any, newModel: string, user:{name?
     throw new Error(error instanceof Error ? error.message : String(error));
   }
 
-}
-
-export async function sendMessageToGemeni(selectedModel: string, chat: Chat) { //DEPRECATED
-  const chatHistory = chat.chatHistory;
-  const streamable = createStreamableValue("");
-  
-  // Get media items for the last message and previous context
-  const lastMessage = chat.chatHistory[chat.chatHistory.length - 1];
-  const mediaItems = chat.mediaItems || [];
-  
-  // Separate current message media from previous context media
-  const currentMessageMedia = mediaItems.filter(media => media.messageId === lastMessage.id);
-  const previousContextMedia = mediaItems.filter(media => media.messageId !== lastMessage.id);
-  
-  // Convert to inline data format
-  const currentInlineData = currentMessageMedia.map(media => ({
-    inlineData: {
-      mimeType: media.fileType,
-      data: media.fileData,
-    },
-  }));
-  
-  const previousInlineData = previousContextMedia.map(media => ({
-    inlineData: {
-      mimeType: media.fileType,
-      data: media.fileData,
-    },
-  }));
-  
-  const allInlineData = [...currentInlineData, ...previousInlineData];
-  console.log(`Sending ${currentInlineData.length} current media items and ${previousInlineData.length} context media items`);
-    // Start the streaming process immediately without awaiting
-    (async () => {
-      try {
-        const ai = new GoogleGenAI({ apiKey: process.env.GOOGLE_API_KEY as string });
-        
-        // Check if this is a model that supports Google Search grounding
-        const supportsGrounding = selectedModel === 'gemini-2.5-flash-lite-preview-06-17' || selectedModel === 'gemini-2.5-flash';
-        
-        const requestConfig: any = {
-          model: selectedModel,
-          contents: createUserContent(["This is the context of user and ai assistant conversation." + JSON.stringify(chatHistory) + " the first " + currentInlineData.length + " inline data elements are new attachments from the most recent message, the other " + previousInlineData.length + " are previous attachments." +
-            "(when the user is referencing the attachments in the prompt of the most recent message, they are likely to refering to the new set of attachments, if there are no attachments in the first set and the user tries to reference new attachments remind the user that they did not attach new data," +
-            "for example, user asks what is this? when there are no new attachments.)" + " Continue the conversation with the user by answering the most recent message, user may refer to older attachments so carefully read context to understand " +
-            "what the user is refering to.", ...allInlineData])
-        };
-        
-        // Add Google Search grounding for supported models
-        if (supportsGrounding) {
-          requestConfig.tools = [{
-            googleSearchRetrieval: {
-              dynamicRetrievalConfig: {
-                mode: 'MODE_DYNAMIC',
-                dynamicThreshold: 0.7
-              }
-            }
-          }];
-        }
-        
-        const response = await ai.models.generateContentStream(requestConfig);
-        
-        for await (const chunk of response) {
-          const text = chunk.text as string;
-          streamable.update(text);
-        }
-      } catch (error) {
-        // Send error through the stream
-        streamable.error(error instanceof Error ? error.message : String(error));
-        return;
-      }
-        streamable.done();
-    })();
-
-    // Return immediately with the stream
-    return { stream: streamable.value, img: null }; 
-  
-}
-
-export async function sendMessageToGemeniImage(selectedModel: string, chat: Chat) { //DEPRECATED
-  const chatHistory = chat.chatHistory;
-  const streamable = createStreamableValue("");
-  const streamableIMG = createStreamableValue("");
-  
-  try {
-    // Get media items for the last message and previous context
-    const lastMessage = chat.chatHistory[chat.chatHistory.length - 1];
-    const mediaItems = chat.mediaItems || [];
-    
-    // Separate current message media from previous context media
-    const currentMessageMedia = mediaItems.filter(media => media.messageId === lastMessage.id);
-    const previousContextMedia = mediaItems.filter(media => media.messageId !== lastMessage.id);
-    
-    // Convert to inline data format
-    const currentInlineData = currentMessageMedia.map(media => ({
-      inlineData: {
-        mimeType: media.fileType,
-        data: media.fileData,
-      },
-    }));
-    
-    const previousInlineData = previousContextMedia.map(media => ({
-      inlineData: {
-        mimeType: media.fileType,
-        data: media.fileData,
-      },
-    }));
-    
-    const allInlineData = [...currentInlineData, ...previousInlineData];
-
-    // Start the async process without awaiting
-    (async () => {
-      try {
-        const ai = new GoogleGenAI({ apiKey: process.env.GOOGLE_API_KEY as string });
-        const response = await ai.models.generateContent({
-          model: selectedModel,
-          contents: createUserContent([
-            "This is the context of user and ai assistant conversation." + JSON.stringify(chatHistory) + " the first " + currentInlineData.length + " inline data elements are new attachments from the most recent message, the other " + previousInlineData.length + " are previous attachments." +
-            "(when the user is referencing the attachments in the prompt of the most recent message, they are likely to refering to the new set of attachments, if there are no attachments in the first set and the user tries to reference new attachments remind the user that they did not attach new data," +
-            "for example, user asks what is this? when there are no new attachments.)" +
-            " Continue the conversation with the user by answering the most recent message, user may refer to older attachments so carefully read context to understand what the user is refering to. (You are a image model so make sure you output images if user asks and cross context from previous prompts unless the user specifically says so)",
-            ...allInlineData
-          ]),
-          config: {
-            responseModalities: [Modality.TEXT, Modality.IMAGE],
-          },
-        });
-
-        if (
-          response.candidates &&
-          response.candidates[0] &&
-          response.candidates[0].content &&
-          Array.isArray(response.candidates[0].content.parts)
-        ) {
-          for (const part of response.candidates[0].content.parts) {
-            if (part.text) {
-              streamable.update(part.text);
-            } else if (part.inlineData && part.inlineData.data) {
-              const buffer = Buffer.from(part.inlineData.data, "base64");
-              streamableIMG.update(part.inlineData.data);
-            }
-          }
-        } else {
-          console.warn('No valid candidates or parts found in Gemini response.');
-        }
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        streamable.error(errorMessage);
-        streamableIMG.error(errorMessage);
-        return;
-      } finally {
-        streamableIMG.done();
-        streamable.done();
-      }
-    })();
-
-    // Return immediately with the streams
-    return { stream: streamable.value, img: streamableIMG.value };
-    
-  } catch (error) {
-    // Handle synchronous errors
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    streamable.error(errorMessage);
-    streamableIMG.error(errorMessage);
-    return { stream: streamable.value, img: streamableIMG.value };
-  }
 }
 
 export async function verifyPass(credentials: { email?: string, password?: string }) {
@@ -521,7 +349,7 @@ export async function createOrUpdateOAuthUser(email: string, name?: string | nul
       };
       
       const result = await db.collection('users').insertOne(newUser);
-      
+
       if (result.acknowledged) {
         return { success: true, created: true, userId: result.insertedId };
       } else {
@@ -530,6 +358,107 @@ export async function createOrUpdateOAuthUser(email: string, name?: string | nul
     }
   } catch (error) {
     console.error('Error creating/updating OAuth user:', error);
+    throw new Error(error instanceof Error ? error.message : String(error));
+  }
+}
+
+// BYOK (bring-your-own-key) connections. All functions here take an `email`
+// that callers must have already verified via getVerifiedEmail() — this
+// module never re-derives trust, since a leaked API key is worse than a
+// leaked chat.
+
+export async function listByokConnections(email: string): Promise<BYOKConnectionMeta[]> {
+  try {
+    const db = await getDatabase();
+    const user = await db.collection('users').findOne(
+      { "email": email },
+      { projection: { "preferences.byokConnections": 1, "_id": 0 } }
+    );
+    const connections: StoredByokConnection[] = user?.preferences?.byokConnections || [];
+    return connections.map(c => ({ id: c.id, label: c.label, baseUrl: c.baseUrl, modelId: c.modelId, createdAt: c.createdAt }));
+  } catch (error) {
+    console.error('Error listing BYOK connections:', error);
+    throw new Error(error instanceof Error ? error.message : String(error));
+  }
+}
+
+export async function getByokConnectionWithKey(email: string, connectionId: string): Promise<{ baseUrl: string; modelId: string; apiKey: string }> {
+  try {
+    const db = await getDatabase();
+    const user = await db.collection('users').findOne(
+      { "email": email },
+      { projection: { "preferences.byokConnections": 1, "_id": 0 } }
+    );
+    const connections: StoredByokConnection[] = user?.preferences?.byokConnections || [];
+    const connection = connections.find(c => c.id === connectionId);
+    if (!connection) {
+      throw new Error(`BYOK connection not found: ${connectionId}`);
+    }
+    return {
+      baseUrl: connection.baseUrl,
+      modelId: connection.modelId,
+      apiKey: decryptSecret(connection.encryptedApiKey),
+    };
+  } catch (error) {
+    console.error('Error getting BYOK connection:', error);
+    throw new Error(error instanceof Error ? error.message : String(error));
+  }
+}
+
+export async function addByokConnection(email: string, connection: { label: string; baseUrl: string; modelId: string; apiKey: string }): Promise<BYOKConnectionMeta> {
+  try {
+    new URL(connection.baseUrl); // throws if not a valid absolute URL
+
+    const db = await getDatabase();
+    const user = await db.collection('users').findOne(
+      { "email": email },
+      { projection: { "preferences.byokConnections": 1, "_id": 0 } }
+    );
+    const existing: StoredByokConnection[] = user?.preferences?.byokConnections || [];
+    if (existing.length >= MAX_BYOK_CONNECTIONS) {
+      throw new Error(`Maximum of ${MAX_BYOK_CONNECTIONS} BYOK connections reached`);
+    }
+
+    const stored: StoredByokConnection = {
+      id: randomUUID(),
+      label: connection.label,
+      baseUrl: connection.baseUrl,
+      modelId: connection.modelId,
+      createdAt: new Date().toISOString(),
+      encryptedApiKey: encryptSecret(connection.apiKey),
+    };
+
+    const result = await db.collection('users').updateOne(
+      { "email": email },
+      { $push: { "preferences.byokConnections": stored as any }, $set: { "updatedAt": new Date() } }
+    );
+
+    if (result.matchedCount === 0) {
+      throw new Error(`User not found: ${email}`);
+    }
+
+    return { id: stored.id, label: stored.label, baseUrl: stored.baseUrl, modelId: stored.modelId, createdAt: stored.createdAt };
+  } catch (error) {
+    console.error('Error adding BYOK connection:', error);
+    throw new Error(error instanceof Error ? error.message : String(error));
+  }
+}
+
+export async function deleteByokConnection(email: string, connectionId: string): Promise<{ success: boolean }> {
+  try {
+    const db = await getDatabase();
+    const result = await db.collection('users').updateOne(
+      { "email": email },
+      { $pull: { "preferences.byokConnections": { id: connectionId } as any }, $set: { "updatedAt": new Date() } }
+    );
+
+    if (result.matchedCount === 0) {
+      throw new Error(`User not found: ${email}`);
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error('Error deleting BYOK connection:', error);
     throw new Error(error instanceof Error ? error.message : String(error));
   }
 }

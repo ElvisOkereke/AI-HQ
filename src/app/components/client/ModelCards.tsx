@@ -31,6 +31,11 @@ export default function ModelCards({ models, selectedModel, onSelect, onClearFil
                     Experimental
                   </span>
                 )}
+                {model.requiresByok && (
+                  <span className="px-1.5 py-0.5 text-xs bg-blue-500/20 text-blue-300 rounded">
+                    Your API key
+                  </span>
+                )}
               </div>
               <div className="flex items-center gap-2 mb-2">
                 <span className={`px-2 py-1 text-xs rounded-full font-medium ${getProviderColor(model.provider)}`}>
@@ -49,7 +54,6 @@ export default function ModelCards({ models, selectedModel, onSelect, onClearFil
               <div className="flex items-center gap-2">
                 <span className="text-xs text-gray-500">Features:</span>
                 <div className="flex items-center gap-1">
-                  <FeatureIcon feature="imageGeneration" enabled={!!model.features.imageGeneration} />
                   <FeatureIcon feature="imageUpload" enabled={!!model.features.imageUpload} />
                   <FeatureIcon feature="fileUpload" enabled={!!model.features.fileUpload} />
                   <FeatureIcon feature="webSearch" enabled={!!model.features.webSearch} />

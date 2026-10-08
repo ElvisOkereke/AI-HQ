@@ -1,6 +1,7 @@
 import { AlertTriangle } from 'lucide-react';
 import { motion } from 'motion/react';
 import { llmModels } from '../models';
+import { LLMModel } from '../../../types/types';
 
 type ModelChangeModalProps = {
   isOpen: boolean;
@@ -8,13 +9,15 @@ type ModelChangeModalProps = {
   onCancel: () => void;
   currentModel: string;
   newModel: string;
+  extraModels?: LLMModel[];
 };
 
-export function ModelChangeModal({ isOpen, onConfirm, onCancel, currentModel, newModel }: ModelChangeModalProps) {
+export function ModelChangeModal({ isOpen, onConfirm, onCancel, currentModel, newModel, extraModels }: ModelChangeModalProps) {
   if (!isOpen) return null;
 
-  const currentModelName = llmModels.find(m => m.id === currentModel)?.name || currentModel;
-  const newModelName = llmModels.find(m => m.id === newModel)?.name || newModel;
+  const allModels = extraModels?.length ? [...llmModels, ...extraModels] : llmModels;
+  const currentModelName = allModels.find(m => m.id === currentModel)?.name || currentModel;
+  const newModelName = allModels.find(m => m.id === newModel)?.name || newModel;
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">

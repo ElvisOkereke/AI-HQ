@@ -11,9 +11,10 @@ type UseChatActionsArgs = {
   user?: User;
   setActiveChat: React.Dispatch<React.SetStateAction<Chat | undefined>>;
   setChatList: React.Dispatch<React.SetStateAction<Chat[]>>;
+  extraModels?: LLMModel[];
 };
 
-export function useChatActions({ activeChat, user, setActiveChat, setChatList }: UseChatActionsArgs) {
+export function useChatActions({ activeChat, user, setActiveChat, setChatList, extraModels }: UseChatActionsArgs) {
   const [input, setInput] = useState('');
   const [selectedModel, setSelectedModel] = useState(llmModels[0]);
   const [showModelChangeModal, setShowModelChangeModal] = useState(false);
@@ -26,11 +27,13 @@ export function useChatActions({ activeChat, user, setActiveChat, setChatList }:
   // Update selected model when active chat changes
   useEffect(() => {
     if (activeChat?.model) {
-      const chatModel = llmModels.find(m => m.id === activeChat.model);
+      const allModels = extraModels?.length ? [...llmModels, ...extraModels] : llmModels;
+      const chatModel = allModels.find(m => m.id === activeChat.model);
       if (chatModel) {
         setSelectedModel(chatModel);
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeChat]);
 
   const handleCopyMessage = (content: string) => {

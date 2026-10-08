@@ -7,7 +7,7 @@
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-3-38B2AC)](https://tailwindcss.com/)
 [![NextAuth.js](https://img.shields.io/badge/NextAuth.js-4-purple)](https://next-auth.js.org/)
 
-A full-stack AI chat platform built with Next.js 15, with pluggable integrations for Google Gemini, Nvidia NIM, and HuggingFace models. Supports streaming responses, image generation, per-chat model switching, media attachments, and a no-signup guest mode.
+A full-stack AI chat platform built with Next.js 15, focused on power-user productivity and deep integration across software design/engineering workflows (with room to branch into other fields). Ships with app-hosted models served through the FuelIX gateway (Gemini, Claude, GPT and more), plus a generic bring-your-own-key (BYOK) connector for any OpenAI-compatible provider. Supports streaming responses, per-chat model switching, media attachments, and a no-signup guest mode.
 
 ## 🔗 Live Demo
 
@@ -30,10 +30,10 @@ Drop images in a `docs/screenshots/` folder and reference them here, e.g.:
 ## ✨ Features
 
 ### 🤖 Multi-Provider AI Integration
-- **Multiple AI Providers** - Google Gemini, Nvidia NIM, HuggingFace
+- **FuelIX Gateway** - Every usable model on the FuelIX API is available in the model picker, fetched live from `/models`
+- **Bring Your Own Key (BYOK)** - Connect any OpenAI-compatible provider (OpenAI, Anthropic-compatible gateways, OpenRouter, Together AI, self-hosted, etc.) with your own API key, encrypted at rest
 - **Dynamic Model Switching** - Change AI models mid-conversation with context preservation
 - **Streaming Responses** - Real-time AI response streaming with typing indicators
-- **Image Generation** - AI-powered image creation (Gemini 2.0 Flash)
 - **Context Preservation** - Intelligent conversation history management
 - **Provider Registry** - Modular system for easy AI provider integration
 
@@ -78,9 +78,8 @@ Drop images in a `docs/screenshots/` folder and reference them here, e.g.:
 - **Server Components** - Secure server-side operations
 
 ### AI Integration
-- **Google Generative AI** - Gemini 2.0/2.5 Flash models
-- **Nvidia NIM** - Enterprise AI inference (Llama 3.1/3.2, Phi-3 Vision)
-- **HuggingFace** - Open-source model access (Llama 4, Mistral)
+- **FuelIX** - OpenAI-compatible gateway (`/chat/completions`), with automatic fallback to the Anthropic-style `/messages` endpoint for models that require it
+- **BYOK Connector** - Generic OpenAI-compatible client for any user-supplied provider/endpoint
 - **Streaming Responses** - Real-time AI output via `ai/rsc`
 
 ### Testing & Tooling
@@ -93,7 +92,7 @@ Drop images in a `docs/screenshots/` folder and reference them here, e.g.:
 ### Prerequisites
 - Node.js 18+
 - MongoDB Atlas account (or local MongoDB)
-- At least one AI provider API key (Google, HuggingFace, or Nvidia)
+- A FuelIX API key
 
 ### Installation
 
@@ -152,10 +151,13 @@ ai-hq/
 │   │       └── db.tsx               # Database operations
 │   ├── lib/
 │   │   ├── rateLimiter.ts           # In-memory guest rate limiter
+│   │   ├── auth/getServerUser.ts    # Verified-session helper (used by BYOK actions)
+│   │   ├── security/encryption.ts   # AES-256-GCM encryption for BYOK keys at rest
 │   │   └── providers/               # AI provider integrations
-│   │       ├── google.tsx
-│   │       ├── nvidia.tsx
-│   │       ├── huggingface.tsx
+│   │       ├── fuelix.tsx           # FuelIX gateway (app-hosted)
+│   │       ├── fuelixModels.ts      # Model list filtering/formatting
+│   │       ├── anthropicMessages.ts # /messages request + SSE helpers
+│   │       ├── byok.tsx             # Generic OpenAI-compatible BYOK connector
 │   │       └── registry.tsx         # Provider routing/selection
 │   ├── types/                       # TypeScript type definitions
 │   ├── utils/
@@ -184,10 +186,13 @@ NEXTAUTH_URL=http://localhost:3000
 GITHUB_ID=your-github-oauth-client-id
 GITHUB_SECRET=your-github-oauth-client-secret
 
-# AI Providers
-GOOGLE_API_KEY=your-google-ai-api-key
-HUGGINGFACE_API_KEY=your-huggingface-api-key
-NVIDIA_API_KEY=your-nvidia-nim-api-key
+# AI Provider (FuelIX)
+FUELIX_API_KEY=your-fuelix-api-key
+# Optional, defaults to https://api.fuelix.ai/v1
+# FUELIX_BASE_URL=https://api.fuelix.ai/v1
+
+# BYOK encryption (users' own API keys are encrypted at rest with this)
+ENCRYPTION_KEY=your-encryption-key
 ```
 
 ### Database Setup
@@ -206,9 +211,8 @@ NVIDIA_API_KEY=your-nvidia-nim-api-key
    - Set it as `NEXTAUTH_SECRET`
 
 ### AI Provider Setup
-- **Google Gemini**: [Google AI Studio](https://makersuite.google.com/)
-- **HuggingFace**: [HuggingFace Settings](https://huggingface.co/settings/tokens)
-- **Nvidia NIM**: [Nvidia Developer Portal](https://developer.nvidia.com/)
+- **FuelIX**: set `FUELIX_API_KEY` (in `.env.local` for local dev, as an environment variable/secret on Vercel)
+- **BYOK**: signed-in users can add their own key for any OpenAI-compatible provider from the in-app API Keys settings panel — no env var needed
 
 ## ⚠️ Known Limitations
 
@@ -242,7 +246,7 @@ docker run -p 3000:3000 ai-hq
 
 ## 🧬 What's Original vs. Starting Point
 
-This project began as an entry for Theo Browne's T3 Chat Cloneathon. Since then it's been substantially reworked: multi-provider AI routing (Gemini/Nvidia NIM/HuggingFace) via a provider registry, guest mode with server-enforced model/rate limits, credentials auth with bcrypt hashing, the categorized logging system, the mobile-responsive layout, and the automated test suite/CI pipeline are all additions on top of the original T3-stack scaffold.
+This project began as an entry for Theo Browne's T3 Chat Cloneathon. Since then it's been substantially reworked: FuelIX-backed AI routing (plus a generic BYOK connector) via a provider registry, guest mode with server-enforced model/rate limits, credentials auth with bcrypt hashing, encrypted per-user BYOK key storage, the categorized logging system, the mobile-responsive layout, and the automated test suite/CI pipeline are all additions on top of the original T3-stack scaffold.
 
 ## 📝 License
 

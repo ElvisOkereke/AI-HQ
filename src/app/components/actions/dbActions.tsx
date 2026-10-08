@@ -1,13 +1,14 @@
 'use server';
-import { createUser, sendMessageToGemeni, fetchChatsByUser, saveChatToDb, newObjectId, generateTitle, updateChatModel, sendMessageToGemeniImage} from '../server/db';
+import { createUser, fetchChatsByUser, saveChatToDb, newObjectId, updateChatModel, getByokConnectionWithKey} from '../server/db';
 import { Chat, SidebarProps, Attachment, Message } from "../../types/types"
 import { headers } from 'next/headers';
 import { checkGuestRateLimit } from '../../lib/rateLimiter';
+import { getVerifiedEmail } from '../../lib/auth/getServerUser';
 
 // Guests are locked to this model server-side regardless of what the client
 // sends, both to control AI provider cost and as defense in depth against
 // someone calling the action directly with a different model id.
-const GUEST_MODEL_ID = 'gemini-2.0-flash';
+const GUEST_MODEL_ID = 'gemini-3.5-flash-lite';
 
 async function enforceGuestRateLimit() {
   const headersList = await headers();
@@ -33,6 +34,16 @@ export async function generateTitleAction(selectedModel: string, userMessage: Me
       selectedModel = GUEST_MODEL_ID;
     }
 
+    if (selectedModel.startsWith('byok:')) {
+      // Guests always fail getVerifiedEmail() — there's no real session to verify.
+      const email = await getVerifiedEmail();
+      const connection = await getByokConnectionWithKey(email, selectedModel.slice(5));
+      const { BYOKProvider } = await import('../../lib/providers/byok');
+      const provider = new BYOKProvider({ baseUrl: connection.baseUrl, apiKey: connection.apiKey });
+      const title = await provider.generateTitle!(connection.modelId, userMessage);
+      return { success: true, data: title };
+    }
+
     const { providerRegistry } = await import('../../lib/providers/registry');
     const { provider, actualModelId } = providerRegistry.getProviderFromModelId(selectedModel);
 
@@ -48,6 +59,16 @@ export async function sendMessageToAIAction(selectedModel: string, chat: Chat, u
     if (user?.isGuest) {
       await enforceGuestRateLimit();
       selectedModel = GUEST_MODEL_ID;
+    }
+
+    if (selectedModel.startsWith('byok:')) {
+      // Guests always fail getVerifiedEmail() — there's no real session to verify.
+      const email = await getVerifiedEmail();
+      const connection = await getByokConnectionWithKey(email, selectedModel.slice(5));
+      const { BYOKProvider } = await import('../../lib/providers/byok');
+      const provider = new BYOKProvider({ baseUrl: connection.baseUrl, apiKey: connection.apiKey });
+      const modelResponse = await provider.sendMessage(connection.modelId, chat);
+      return { success: true, data: modelResponse };
     }
 
     const { providerRegistry } = await import('../../lib/providers/registry');

@@ -1,19 +1,17 @@
 import React, { useState } from 'react';
-import { ImagePlus, ImageUp, Paperclip, Globe } from 'lucide-react';
+import { ImageUp, Paperclip, Globe } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 
-const featureIconKeys = ['imageGeneration', 'imageUpload', 'fileUpload', 'webSearch'] as const;
+const featureIconKeys = ['imageUpload', 'fileUpload', 'webSearch'] as const;
 export type FeatureIconKey = typeof featureIconKeys[number];
 
 const monokaiFeatureIcons: Record<FeatureIconKey, React.ComponentType<{ className?: string }>> = {
-  imageGeneration: ImagePlus,
   imageUpload: ImageUp,
   fileUpload: Paperclip,
   webSearch: Globe,
 };
 
 const enabledColors: Record<FeatureIconKey, string> = {
-  imageGeneration: 'text-pink-400',
   imageUpload: 'text-orange-400',
   fileUpload: 'text-yellow-400',
   webSearch: 'text-green-400',
@@ -67,7 +65,6 @@ export const getCategoryColor = (category: string) => {
   const colors: Record<string, string> = {
     text: 'bg-blue-500/20 text-blue-300',
     multimodal: 'bg-purple-500/20 text-purple-300',
-    image: 'bg-pink-500/20 text-pink-300',
     code: 'bg-green-500/20 text-green-300',
     reasoning: 'bg-yellow-500/20 text-yellow-300'
   };
@@ -76,11 +73,8 @@ export const getCategoryColor = (category: string) => {
 
 export const getProviderColor = (provider: string) => {
   const colors: Record<string, string> = {
-    Google: 'bg-red-500/20 text-red-300',
-    HuggingFace: 'bg-orange-500/20 text-orange-300',
-    Nvidia: 'bg-green-500/20 text-green-300',
-    OpenAI: 'bg-teal-500/20 text-teal-300',
-    Anthropic: 'bg-indigo-500/20 text-indigo-300'
+    Fuelix: 'bg-orange-500/20 text-orange-300',
+    BYOK: 'bg-blue-500/20 text-blue-300'
   };
   return colors[provider] || 'bg-gray-500/20 text-gray-300';
 };

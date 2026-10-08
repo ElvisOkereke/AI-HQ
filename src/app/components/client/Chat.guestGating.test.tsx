@@ -29,7 +29,7 @@ vi.mock('./ModelDropdown', () => ({
     <div data-testid="model-dropdown" data-disabled={disabled ? 'true' : 'false'} />
   ),
   llmModels: [
-    { id: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash', icon: () => null, features: {}, description: '', provider: 'Google', category: 'multimodal' },
+    { id: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash', icon: () => null, features: {}, description: '', provider: 'Fuelix', category: 'multimodal' },
   ],
 }));
 

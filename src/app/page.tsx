@@ -6,10 +6,13 @@ import ChatComponent from "./components/client/Chat";
 import SignInForm from './components/client/SignIn';
 import SignUpForm from './components/client/SignUp';
 import UpdateAlert from './components/client/UpdateAlert';
-import { Building2, Menu } from 'lucide-react';
+import { Building2, Menu, KeyRound } from 'lucide-react';
 import { useSession, signIn, signOut } from "next-auth/react";
-import { Chat, User } from "./types/types";
+import { Chat, User, LLMModel } from "./types/types";
 import { getUserPreferencesAction, createOrUpdateOAuthUserAction } from './components/actions/dbActions';
+import { listByokConnectionsAction } from './components/actions/byokActions';
+import { listFuelixModelsAction } from './components/actions/fuelixActions';
+import { toExtraFuelixModels } from './components/client/models';
 import { logger } from './utils/logger';
 
 export default function HomePage() {
@@ -20,10 +23,47 @@ export default function HomePage() {
   const [showSignInForm, setShowSignInForm] = useState(false);
   const [showSignUpForm, setShowSignUpForm] = useState(false);
   const [userPreferences, setUserPreferences] = useState<User>({});
+  const [byokModels, setByokModels] = useState<LLMModel[]>([]);
+  const [fuelixModels, setFuelixModels] = useState<LLMModel[]>([]);
   const [showMobileSidebar, setShowMobileSidebar] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [isGuestMode, setIsGuestMode] = useState(false);
   const router = useRouter();
+
+  const loadByokModels = async () => {
+    try {
+      const result = await listByokConnectionsAction();
+      if (result.success && result.data) {
+        setByokModels(result.data.map((c): LLMModel => ({
+          id: `byok:${c.id}`,
+          name: c.label,
+          icon: KeyRound,
+          features: { streaming: true },
+          description: `Your own connection to ${c.baseUrl} (${c.modelId})`,
+          provider: 'BYOK',
+          category: 'text',
+          requiresByok: true,
+        })));
+      } else {
+        setByokModels([]);
+      }
+    } catch (error) {
+      // Guests always fail here (no real session) - that's the expected gating, not an error to surface
+      setByokModels([]);
+    }
+  };
+
+  // Failure (e.g. FuelIX unreachable) just leaves the static fallback list in place
+  const loadFuelixModels = async () => {
+    try {
+      const result = await listFuelixModelsAction();
+      if (result.success && result.data) {
+        setFuelixModels(toExtraFuelixModels(result.data));
+      }
+    } catch (error) {
+      logger.warn('Could not load FuelIX model list, using fallback list');
+    }
+  };
 
   const guestUser: User = { name: 'Guest', email: 'guest@local', isGuest: true };
   const effectiveUser = isGuestMode ? guestUser : userPreferences;
@@ -125,6 +165,8 @@ export default function HomePage() {
       };
       
       loadUserPreferences();
+      loadByokModels();
+      loadFuelixModels();
     }
   }, [session?.user?.email]);
 
@@ -264,6 +306,7 @@ export default function HomePage() {
           setActiveChat={setActiveChat}
           onLogout={handleLogout}
           user={effectiveUser}
+          onByokConnectionsChanged={loadByokModels}
         />
       </div>
 
@@ -298,6 +341,7 @@ export default function HomePage() {
             setActiveChat={setActiveChat}
             setChatList={setChatList}
             user={effectiveUser}
+            extraModels={[...fuelixModels, ...byokModels]}
           />
         </div>
       </main>
