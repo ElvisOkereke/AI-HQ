@@ -8,7 +8,7 @@ import { MessageBubble } from './chat/MessageBubble';
 import { ChatComposer } from './chat/ChatComposer';
 import { useChatActions } from './chat/useChatActions';
 
-export default function ChatComponent({ activeChat, user, setActiveChat, setChatList, extraModels }: ChatProps) {
+export default function ChatComponent({ activeChat, setActiveChat, setChatList, extraModels }: ChatProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -33,7 +33,7 @@ export default function ChatComponent({ activeChat, user, setActiveChat, setChat
     handleFileUpload,
     handleSend,
     handleKeyPress,
-  } = useChatActions({ activeChat, user, setActiveChat, setChatList, extraModels });
+  } = useChatActions({ activeChat, setActiveChat, setChatList, extraModels });
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -60,7 +60,6 @@ export default function ChatComponent({ activeChat, user, setActiveChat, setChat
           <ModelDropdown
             selectedModel={selectedModel}
             onModelSelect={handleModelChange}
-            disabled={user?.isGuest}
             extraModels={extraModels}
           />
         </header>
@@ -88,7 +87,7 @@ export default function ChatComponent({ activeChat, user, setActiveChat, setChat
         <ModelDropdown
           selectedModel={selectedModel}
           onModelSelect={handleModelChange}
-          disabled={user?.isGuest}
+          extraModels={extraModels}
         />
       </header>
       <main className="flex-1 overflow-y-auto p-2 sm:p-4 lg:p-6 space-y-4 sm:space-y-6 lg:space-y-8 chat-scrollbar">

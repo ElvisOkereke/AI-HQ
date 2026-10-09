@@ -8,7 +8,7 @@ describe('llmModels (static fallback)', () => {
     expect(new Set(llmModels.map(m => m.id)).size).toBe(llmModels.length);
   });
 
-  it('keeps the guest-locked model available', () => {
+  it('includes the model used for title generation', () => {
     expect(llmModels.some(m => m.id === 'gemini-3.5-flash-lite')).toBe(true);
   });
 });

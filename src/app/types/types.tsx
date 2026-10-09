@@ -48,13 +48,12 @@ export type User = {
   preferences?: {
     loggingEnabled?: boolean;
   };
-  isGuest?: boolean;
+  isAnonymous?: boolean; // not signed in; data is kept under an anonymous cookie id
 };
 
 export type ChatProps = {
   key: string | null;
   activeChat: Chat | undefined;
-  user?: User;
   setActiveChat: React.Dispatch<React.SetStateAction<Chat | undefined>>;
   setChatList: React.Dispatch<React.SetStateAction<Chat[]>>;
   extraModels?: LLMModel[];
@@ -66,10 +65,11 @@ export type SidebarProps = {
   setChatList: React.Dispatch<React.SetStateAction<Chat[]>>;
   setActiveChat: React.Dispatch<React.SetStateAction<Chat | undefined>>;
   onLogout: () => void;
+  onSignIn?: () => void;
   user?: {
     name?: string | null;
     email?: string | null;
-    isGuest?: boolean;
+    isAnonymous?: boolean;
   };
   onByokConnectionsChanged?: () => void;
 };

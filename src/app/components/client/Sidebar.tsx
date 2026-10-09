@@ -1,5 +1,5 @@
 'use client';
-import { Plus, MessageSquare, LogOut, User, ChevronLeft, ChevronRight, Terminal, KeyRound } from 'lucide-react';
+import { Plus, MessageSquare, LogOut, LogIn, User, ChevronLeft, ChevronRight, Terminal, KeyRound } from 'lucide-react';
 import React, { useState, useEffect } from 'react';
 import { fetchChatsByUserAction } from '../actions/dbActions';
 import { SidebarProps } from "../../types/types"
@@ -7,7 +7,7 @@ import DebugPanel from './DebugPanel';
 import SettingsPanel from './SettingsPanel';
 import { logger } from '../../utils/logger';
 
-export default function Sidebar({ chatList, setChatList, activeChat, setActiveChat, onLogout, user, onByokConnectionsChanged }: SidebarProps) {
+export default function Sidebar({ chatList, setChatList, activeChat, setActiveChat, onLogout, onSignIn, user, onByokConnectionsChanged }: SidebarProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [showDebugPanel, setShowDebugPanel] = useState(false);
@@ -35,17 +35,16 @@ export default function Sidebar({ chatList, setChatList, activeChat, setActiveCh
   }, [isCollapsed]);
   
   useEffect(() => {
-    if(user && !user.isGuest){// fetch only if user is logged in (guests have no server-side chats)
+    // The server resolves whose chats these are (session or anonymous cookie)
     const fetchAllChats = async () => {
-      const fetchChats = await fetchChatsByUserAction(user.email as string);
+      const fetchChats = await fetchChatsByUserAction();
       if (!fetchChats.success) {
         logger.error('Failed to fetch chats:', fetchChats.error);
-        throw new Error(fetchChats.error);
+        return;
       }
       setChatList(fetchChats.data ?? []);
     };
     fetchAllChats();
-    }
   }, [])
 
   const toggleSidebar = () => {
@@ -157,21 +156,31 @@ export default function Sidebar({ chatList, setChatList, activeChat, setActiveCh
           )}
         </button>
 
-        {/* API Keys Button - hidden entirely for guests, they have no account to attach keys to */}
-        {!user?.isGuest && (
+        {/* API Keys Button */}
+        <button
+          onClick={() => setShowSettingsPanel(true)}
+          className={`flex items-center w-full p-2 rounded-lg transition-colors text-gray-400 hover:text-white hover:bg-gray-700/50 ${
+            isCollapsed ? 'justify-center' : 'gap-3'
+          }`}
+          title={isCollapsed ? "API Keys" : ""}
+        >
+          <KeyRound className="w-4 h-4" />
+          {!isCollapsed && <span className="text-sm">API Keys</span>}
+        </button>
+
+        {/* User Profile - anonymous visitors get a sign-in button instead */}
+        {user?.isAnonymous ? (
           <button
-            onClick={() => setShowSettingsPanel(true)}
-            className={`flex items-center w-full p-2 rounded-lg transition-colors text-gray-400 hover:text-white hover:bg-gray-700/50 ${
+            onClick={onSignIn}
+            className={`flex items-center w-full p-2 rounded-lg transition-colors text-gray-300 hover:text-white hover:bg-gray-700/50 ${
               isCollapsed ? 'justify-center' : 'gap-3'
             }`}
-            title={isCollapsed ? "API Keys" : ""}
+            title={isCollapsed ? "Sign in" : "Sign in to keep your chats across devices"}
           >
-            <KeyRound className="w-4 h-4" />
-            {!isCollapsed && <span className="text-sm">API Keys</span>}
+            <LogIn className="w-5 h-5" />
+            {!isCollapsed && <span className="font-semibold">Sign in</span>}
           </button>
-        )}
-
-        {/* User Profile */}
+        ) : (
         <div className={`flex items-center p-2 rounded-lg hover:bg-gray-700/50 cursor-pointer ${
           isCollapsed ? 'justify-center' : 'gap-3'
         }`}>
@@ -199,6 +208,7 @@ export default function Sidebar({ chatList, setChatList, activeChat, setActiveCh
             </>
           )}
         </div>
+        )}
       </div>
       
       {/* Debug Panel */}
@@ -207,16 +217,14 @@ export default function Sidebar({ chatList, setChatList, activeChat, setActiveCh
         onClose={() => setShowDebugPanel(false)}
       />
 
-      {/* Settings Panel (API Keys / BYOK) - not mounted at all for guests */}
-      {!user?.isGuest && (
-        <SettingsPanel
-          isOpen={showSettingsPanel}
-          onClose={() => {
-            setShowSettingsPanel(false);
-            onByokConnectionsChanged?.();
-          }}
-        />
-      )}
+      {/* Settings Panel (API Keys / BYOK) */}
+      <SettingsPanel
+        isOpen={showSettingsPanel}
+        onClose={() => {
+          setShowSettingsPanel(false);
+          onByokConnectionsChanged?.();
+        }}
+      />
     </div>
   );
 }

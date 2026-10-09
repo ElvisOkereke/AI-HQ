@@ -1,21 +1,19 @@
 'use server';
 import { createUser, fetchChatsByUser, saveChatToDb, newObjectId, updateChatModel, getByokConnectionWithKey} from '../server/db';
-import { Chat, SidebarProps, Attachment, Message } from "../../types/types"
+import { Chat, Message } from "../../types/types"
 import { headers } from 'next/headers';
-import { checkGuestRateLimit } from '../../lib/rateLimiter';
-import { getVerifiedEmail } from '../../lib/auth/getServerUser';
+import { checkRateLimit } from '../../lib/rateLimiter';
+import { getRequestIdentity } from '../../lib/auth/getServerUser';
 
-// Guests are locked to this model server-side regardless of what the client
-// sends, both to control AI provider cost and as defense in depth against
-// someone calling the action directly with a different model id.
-const GUEST_MODEL_ID = 'gemini-3.5-flash-lite';
+// Chat actions never accept an email/user from the client: identity is always
+// resolved server-side (session email, or the anonymous cookie id).
 
-async function enforceGuestRateLimit() {
+async function enforceRateLimit() {
   const headersList = await headers();
   const ip = headersList.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
-  const { allowed } = checkGuestRateLimit(ip);
+  const { allowed } = checkRateLimit(ip);
   if (!allowed) {
-    throw new Error('Guest rate limit reached. Please sign up for unlimited access.');
+    throw new Error('Rate limit reached. Please wait a while before sending more messages.');
   }
 }
 
@@ -27,17 +25,11 @@ export async function createUserAction(formData: string) {
     return { success: false, error: error instanceof Error ? error.message : String(error) };
   }
 }
-export async function generateTitleAction(selectedModel: string, userMessage: Message, user?: { isGuest?: boolean }) {
+export async function generateTitleAction(selectedModel: string, userMessage: Message) {
   try{
-    if (user?.isGuest) {
-      await enforceGuestRateLimit();
-      selectedModel = GUEST_MODEL_ID;
-    }
-
     if (selectedModel.startsWith('byok:')) {
-      // Guests always fail getVerifiedEmail() — there's no real session to verify.
-      const email = await getVerifiedEmail();
-      const connection = await getByokConnectionWithKey(email, selectedModel.slice(5));
+      const identity = await getRequestIdentity();
+      const connection = await getByokConnectionWithKey(identity, selectedModel.slice(5));
       const { BYOKProvider } = await import('../../lib/providers/byok');
       const provider = new BYOKProvider({ baseUrl: connection.baseUrl, apiKey: connection.apiKey });
       const title = await provider.generateTitle!(connection.modelId, userMessage);
@@ -54,22 +46,19 @@ export async function generateTitleAction(selectedModel: string, userMessage: Me
   }
 }
 
-export async function sendMessageToAIAction(selectedModel: string, chat: Chat, user: { name?: string | null, email?: string | null, isGuest?: boolean }) {
+export async function sendMessageToAIAction(selectedModel: string, chat: Chat) {
   try {
-    if (user?.isGuest) {
-      await enforceGuestRateLimit();
-      selectedModel = GUEST_MODEL_ID;
-    }
-
     if (selectedModel.startsWith('byok:')) {
-      // Guests always fail getVerifiedEmail() — there's no real session to verify.
-      const email = await getVerifiedEmail();
-      const connection = await getByokConnectionWithKey(email, selectedModel.slice(5));
+      // BYOK runs on the user's own key, so it isn't rate limited
+      const identity = await getRequestIdentity();
+      const connection = await getByokConnectionWithKey(identity, selectedModel.slice(5));
       const { BYOKProvider } = await import('../../lib/providers/byok');
       const provider = new BYOKProvider({ baseUrl: connection.baseUrl, apiKey: connection.apiKey });
       const modelResponse = await provider.sendMessage(connection.modelId, chat);
       return { success: true, data: modelResponse };
     }
+
+    await enforceRateLimit();
 
     const { providerRegistry } = await import('../../lib/providers/registry');
     const { provider, actualModelId } = providerRegistry.getProviderFromModelId(selectedModel);
@@ -84,9 +73,9 @@ export async function sendMessageToAIAction(selectedModel: string, chat: Chat, u
     return { success: false, error: error instanceof Error ? error.message : String(error) };
   }
 }
-export async function fetchChatsByUserAction(email: string){
+export async function fetchChatsByUserAction(){
   try{
-    const chats = await fetchChatsByUser(email);
+    const chats = await fetchChatsByUser(await getRequestIdentity());
     return { success: true, data: chats };
 
   }catch (error) {
@@ -103,9 +92,9 @@ export async function newObjectIdAction(){
   }
 
 }
-export async function saveChatToDbAction(chat: Chat, user:{name?: string | null, email?: string | null}){
+export async function saveChatToDbAction(chat: Chat){
   try{
-    const res = await saveChatToDb(chat, user);
+    const res = await saveChatToDb(chat, { email: await getRequestIdentity() });
     return { success: true, data: res };
   }catch (error) {
     return { success: false, error: error instanceof Error ? error.message : String(error) };
@@ -113,12 +102,9 @@ export async function saveChatToDbAction(chat: Chat, user:{name?: string | null,
 
 }
 
-export async function updateChatModelAction(chatId: any, newModel: string, user: { name?: string | null; email?: string | null; }): Promise<{ success: boolean; data?: any; error?: string }> {
+export async function updateChatModelAction(chatId: any, newModel: string): Promise<{ success: boolean; data?: any; error?: string }> {
   try {
-    if (!user?.email) {
-      return { success: false, error: 'User not authenticated' };
-    }
-    const result = await updateChatModel(chatId, newModel, user);
+    await updateChatModel(chatId, newModel, { email: await getRequestIdentity() });
 
     return { success: true, data: { chatId, newModel } };
   } catch (error) {

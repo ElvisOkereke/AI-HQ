@@ -1,12 +1,10 @@
 'use server';
-import { getVerifiedEmail } from '../../lib/auth/getServerUser';
 import { fetchFuelixModelIds } from '../../lib/providers/fuelix';
 import { buildFuelixModelList } from '../../lib/providers/fuelixModels';
 
-// Requires a real session so anonymous callers can't trigger upstream calls with the app's key.
+// Open to everyone; the upstream /models call is cached for 10 minutes so repeat calls are cheap.
 export async function listFuelixModelsAction() {
   try {
-    await getVerifiedEmail();
     const ids = await fetchFuelixModelIds();
     return { success: true, data: buildFuelixModelList(ids) };
   } catch (error) {

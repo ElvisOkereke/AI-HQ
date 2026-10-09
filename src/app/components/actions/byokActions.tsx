@@ -1,15 +1,15 @@
 'use server';
 import { listByokConnections, addByokConnection, deleteByokConnection } from '../server/db';
-import { getVerifiedEmail } from '../../lib/auth/getServerUser';
+import { getRequestIdentity } from '../../lib/auth/getServerUser';
 
 // These actions never accept an email/user param from the client — the only
-// identity they trust is whatever getVerifiedEmail() resolves from the real
-// server session, so there's nothing here for a client to spoof.
+// identity they trust is whatever getRequestIdentity() resolves server-side
+// (session email or anonymous cookie id), so there's nothing here to spoof.
 
 export async function listByokConnectionsAction() {
   try {
-    const email = await getVerifiedEmail();
-    const connections = await listByokConnections(email);
+    const identity = await getRequestIdentity();
+    const connections = await listByokConnections(identity);
     return { success: true, data: connections };
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : String(error) };
@@ -18,8 +18,8 @@ export async function listByokConnectionsAction() {
 
 export async function addByokConnectionAction(connection: { label: string; baseUrl: string; modelId: string; apiKey: string }) {
   try {
-    const email = await getVerifiedEmail();
-    const meta = await addByokConnection(email, connection);
+    const identity = await getRequestIdentity();
+    const meta = await addByokConnection(identity, connection);
     return { success: true, data: meta };
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : String(error) };
@@ -28,8 +28,8 @@ export async function addByokConnectionAction(connection: { label: string; baseU
 
 export async function deleteByokConnectionAction(connectionId: string) {
   try {
-    const email = await getVerifiedEmail();
-    const result = await deleteByokConnection(email, connectionId);
+    const identity = await getRequestIdentity();
+    const result = await deleteByokConnection(identity, connectionId);
     return { success: true, data: result };
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : String(error) };

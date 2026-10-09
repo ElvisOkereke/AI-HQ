@@ -27,7 +27,7 @@ export default function HomePage() {
   const [fuelixModels, setFuelixModels] = useState<LLMModel[]>([]);
   const [showMobileSidebar, setShowMobileSidebar] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
-  const [isGuestMode, setIsGuestMode] = useState(false);
+  const [showSignInScreen, setShowSignInScreen] = useState(false);
   const router = useRouter();
 
   const loadByokModels = async () => {
@@ -48,7 +48,6 @@ export default function HomePage() {
         setByokModels([]);
       }
     } catch (error) {
-      // Guests always fail here (no real session) - that's the expected gating, not an error to surface
       setByokModels([]);
     }
   };
@@ -65,9 +64,18 @@ export default function HomePage() {
     }
   };
 
-  const guestUser: User = { name: 'Guest', email: 'guest@local', isGuest: true };
-  const effectiveUser = isGuestMode ? guestUser : userPreferences;
-  
+  // Not signed in: everything still works, data is kept under the anonymous cookie id server-side
+  const anonymousUser: User = { name: 'Anonymous', isAnonymous: true };
+  const effectiveUser = session ? userPreferences : anonymousUser;
+
+  // Model lists are available to everyone; reload when the identity changes (sign in/out)
+  useEffect(() => {
+    if (status === 'loading') return;
+    setActiveChat(undefined); // a chat open under the previous identity doesn't belong to this one
+    loadByokModels();
+    loadFuelixModels();
+  }, [status, session?.user?.email]);
+
   // Check screen size for mobile responsiveness
   useEffect(() => {
     const checkScreenSize = () => {
@@ -165,19 +173,10 @@ export default function HomePage() {
       };
       
       loadUserPreferences();
-      loadByokModels();
-      loadFuelixModels();
     }
   }, [session?.user?.email]);
 
-  // Handle logout using NextAuth (or just exit guest mode, which never had a real session)
   const handleLogout = () => {
-    if (isGuestMode) {
-      setIsGuestMode(false);
-      setActiveChat(undefined);
-      setChatList([]);
-      return;
-    }
     signOut();
   };
 
@@ -194,7 +193,7 @@ export default function HomePage() {
   }
 
   // Show sign-in form if requested
-  if (showSignInForm) {
+  if (showSignInForm && !session) {
     return (
       <SignInForm 
         onBack={() => setShowSignInForm(false)} 
@@ -203,7 +202,7 @@ export default function HomePage() {
   }
 
   // Show sign-up form if requested
-  if (showSignUpForm) {
+  if (showSignUpForm && !session) {
     return (
       <SignUpForm 
         onBack={() => setShowSignUpForm(false)}
@@ -215,22 +214,14 @@ export default function HomePage() {
       )
   }
 
-  // Show login page if not authenticated and not in guest mode
-  if (!session && !isGuestMode) {
+  // Optional sign-in screen (opened from the sidebar); the app itself never requires an account
+  if (!session && showSignInScreen) {
     return (
       <div className="flex flex-col items-center justify-center h-screen bg-gray-900 text-white font-sans">
         <div className="text-center w-full max-w-sm">
           <Building2 className="w-24 h-24 text-purple-400 mx-auto mb-6" />
-          <h1 className="text-4xl font-bold mb-2">Welcome to AI.HQ</h1>
-          <p className="text-gray-400 mb-8">Sign in to begin your conversation with the future of AI.</p>
-
-          {/* Guest mode - try instantly, no signup */}
-          <button
-            onClick={() => setIsGuestMode(true)}
-            className="w-full mb-6 px-6 py-3 bg-gradient-to-r from-purple-500 to-blue-500 rounded-lg font-semibold hover:opacity-90 transition-opacity"
-          >
-            Try as Guest — no signup required
-          </button>
+          <h1 className="text-4xl font-bold mb-2">Sign in to AI.HQ</h1>
+          <p className="text-gray-400 mb-8">Optional: an account keeps your chats and API keys across devices.</p>
 
           {/* OAuth Sign-in buttons */}
           <div className="flex flex-col gap-3 mb-6">
@@ -262,12 +253,19 @@ export default function HomePage() {
             </button>
             </div>
           </div>
+
+          <button
+            onClick={() => setShowSignInScreen(false)}
+            className="mt-6 text-sm text-gray-400 hover:text-white transition-colors"
+          >
+            ← Back to chat
+          </button>
         </div>
       </div>
     );
   }
 
-  // Show main app if authenticated (or in guest mode)
+  // Main app, for signed-in and anonymous visitors alike
   return (
     <div className="flex h-screen bg-gray-900 text-white font-sans overflow-hidden">
       {/* Update Alert */}
@@ -305,6 +303,7 @@ export default function HomePage() {
           setChatList={setChatList}
           setActiveChat={setActiveChat}
           onLogout={handleLogout}
+          onSignIn={() => setShowSignInScreen(true)}
           user={effectiveUser}
           onByokConnectionsChanged={loadByokModels}
         />
@@ -312,13 +311,6 @@ export default function HomePage() {
 
       {/* Main Content */}
       <main className={`flex-1 flex flex-col min-w-0 ${isMobile ? 'w-full' : ''}`}>
-        {/* Guest mode banner */}
-        {isGuestMode && (
-          <div className="flex items-center justify-center gap-2 px-4 py-2 bg-purple-900/40 border-b border-purple-700 text-sm text-purple-200 text-center">
-            <span>Guest mode — chats aren&apos;t saved and the model is locked. Sign up to keep your history and unlock all models.</span>
-          </div>
-        )}
-
         {/* Mobile Header with Menu Button */}
         {isMobile && (
           <header className="flex items-center gap-3 p-4 border-b border-gray-700 bg-gray-800">
@@ -340,7 +332,6 @@ export default function HomePage() {
             activeChat={activeChat}
             setActiveChat={setActiveChat}
             setChatList={setChatList}
-            user={effectiveUser}
             extraModels={[...fuelixModels, ...byokModels]}
           />
         </div>

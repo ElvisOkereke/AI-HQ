@@ -3,9 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import ChatComponent from './Chat';
 import {
-  newObjectIdAction,
   sendMessageToAIAction,
-  generateTitleAction,
   saveChatToDbAction,
 } from '../actions/dbActions';
 import { readStreamableValue } from 'ai/rsc';
@@ -25,11 +23,15 @@ vi.mock('ai/rsc', () => ({
 
 vi.mock('./ModelDropdown', () => ({
   __esModule: true,
-  default: ({ disabled }: { disabled?: boolean }) => (
-    <div data-testid="model-dropdown" data-disabled={disabled ? 'true' : 'false'} />
+  default: ({ disabled, extraModels }: { disabled?: boolean; extraModels?: unknown[] }) => (
+    <div
+      data-testid="model-dropdown"
+      data-disabled={disabled ? 'true' : 'false'}
+      data-extra-count={String(extraModels?.length ?? 0)}
+    />
   ),
   llmModels: [
-    { id: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash', icon: () => null, features: {}, description: '', provider: 'Fuelix', category: 'multimodal' },
+    { id: 'gemini-3.6-flash', name: 'Gemini 3.6 Flash', icon: () => null, features: {}, description: '', provider: 'Fuelix', category: 'text' },
   ],
 }));
 
@@ -57,12 +59,14 @@ function makeChat(): Chat {
     _id: 'chat-1',
     title: 'Existing Chat',
     chatHistory: [],
-    model: 'gemini-2.0-flash',
+    model: 'gemini-3.6-flash',
     mediaItems: [],
   };
 }
 
-describe('Chat guest-mode DB gating', () => {
+const extraModel = { id: 'o4-mini', name: 'O4 Mini', icon: () => null, features: {}, description: '', provider: 'Fuelix' as const, category: 'reasoning' as const };
+
+describe('Chat persistence and model access (no account required)', () => {
   beforeEach(() => {
     vi.mocked(saveChatToDbAction).mockReset().mockResolvedValue({ success: true, data: 'ok' } as any);
     vi.mocked(sendMessageToAIAction).mockReset().mockResolvedValue({
@@ -72,43 +76,15 @@ describe('Chat guest-mode DB gating', () => {
     vi.mocked(readStreamableValue).mockReset().mockImplementation(() => fakeStream(['Hello']) as any);
   });
 
-  it('does not persist to the database when sending a message as a guest', async () => {
+  it('sends and saves without passing any client-side identity to the server', async () => {
     const user = userEvent.setup();
-    const setActiveChat = vi.fn();
-    const setChatList = vi.fn();
 
     render(
       <ChatComponent
         key="chat-1"
         activeChat={makeChat()}
-        user={{ name: 'Guest', email: 'guest@local', isGuest: true }}
-        setActiveChat={setActiveChat}
-        setChatList={setChatList}
-      />
-    );
-
-    await user.type(screen.getByPlaceholderText('Ask anything...'), 'Hello there');
-    await user.click(screen.getByRole('button'));
-
-    await waitFor(() => {
-      expect(sendMessageToAIAction).toHaveBeenCalled();
-    });
-
-    expect(saveChatToDbAction).not.toHaveBeenCalled();
-  });
-
-  it('persists to the database when sending a message as a signed-in user', async () => {
-    const user = userEvent.setup();
-    const setActiveChat = vi.fn();
-    const setChatList = vi.fn();
-
-    render(
-      <ChatComponent
-        key="chat-1"
-        activeChat={makeChat()}
-        user={{ name: 'Real User', email: 'real@example.com', isGuest: false }}
-        setActiveChat={setActiveChat}
-        setChatList={setChatList}
+        setActiveChat={vi.fn()}
+        setChatList={vi.fn()}
       />
     );
 
@@ -118,19 +94,36 @@ describe('Chat guest-mode DB gating', () => {
     await waitFor(() => {
       expect(saveChatToDbAction).toHaveBeenCalled();
     });
+
+    // Identity is resolved server-side, so the actions only receive the model and chat
+    expect(vi.mocked(sendMessageToAIAction).mock.calls[0]).toHaveLength(2);
+    expect(vi.mocked(saveChatToDbAction).mock.calls[0]).toHaveLength(1);
   });
 
-  it('renders the model dropdown as disabled for guests', () => {
+  it('never disables model switching', () => {
     render(
       <ChatComponent
         key="chat-1"
         activeChat={makeChat()}
-        user={{ name: 'Guest', email: 'guest@local', isGuest: true }}
         setActiveChat={vi.fn()}
         setChatList={vi.fn()}
       />
     );
 
-    expect(screen.getByTestId('model-dropdown')).toHaveAttribute('data-disabled', 'true');
+    expect(screen.getByTestId('model-dropdown')).toHaveAttribute('data-disabled', 'false');
+  });
+
+  it('offers the live/BYOK models inside an existing chat, not just on the new-chat screen', () => {
+    render(
+      <ChatComponent
+        key="chat-1"
+        activeChat={makeChat()}
+        setActiveChat={vi.fn()}
+        setChatList={vi.fn()}
+        extraModels={[extraModel]}
+      />
+    );
+
+    expect(screen.getByTestId('model-dropdown')).toHaveAttribute('data-extra-count', '1');
   });
 });

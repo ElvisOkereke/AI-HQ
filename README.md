@@ -7,21 +7,21 @@
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-3-38B2AC)](https://tailwindcss.com/)
 [![NextAuth.js](https://img.shields.io/badge/NextAuth.js-4-purple)](https://next-auth.js.org/)
 
-A full-stack AI chat platform built with Next.js 15, focused on power-user productivity and deep integration across software design/engineering workflows (with room to branch into other fields). Ships with app-hosted models served through the FuelIX gateway (Gemini, Claude, GPT and more), plus a generic bring-your-own-key (BYOK) connector for any OpenAI-compatible provider. Supports streaming responses, per-chat model switching, media attachments, and a no-signup guest mode.
+A full-stack AI chat platform built with Next.js 15, focused on power-user productivity and deep integration across software design/engineering workflows (with room to branch into other fields). Ships with app-hosted models served through the FuelIX gateway (Gemini, Claude, GPT and more), plus a generic bring-your-own-key (BYOK) connector for any OpenAI-compatible provider. Supports streaming responses, per-chat model switching, media attachments, and full access with no account required.
 
 ## 🔗 Live Demo
 
 **[<!-- TODO: paste Vercel production URL here -->](#)**
 
-Click "Try as Guest" on the landing page to start chatting immediately — no account required. Guest sessions are locked to a single default model and aren't saved to a database; sign up (email/password or GitHub) to unlock model switching and persistent chat history.
+Open the app and start chatting immediately — no account required, every feature unlocked. Chats and API keys are saved under an anonymous browser cookie; signing in (email/password or GitHub) is optional and keeps them on your account instead.
 
 ## 📸 Screenshots
 
 <!--
 TODO: Replace this section with actual screenshots before sharing the repo. Recommended captures:
-  1. Landing page (signed out) showing the "Sign In" and "Try as Guest" entry points
+  1. The app as a first-time visitor sees it (no sign-in required), with the sidebar "Sign in" button
   2. An active chat with a streamed response and the model dropdown open
-  3. The guest-mode banner + locked model selector
+  3. The API Keys (BYOK) panel
   4. Mobile view of the sidebar/hamburger navigation
 Drop images in a `docs/screenshots/` folder and reference them here, e.g.:
   ![Landing page](docs/screenshots/landing.png)
@@ -40,7 +40,7 @@ Drop images in a `docs/screenshots/` folder and reference them here, e.g.:
 ### 🔐 Authentication & User Management
 - **NextAuth.js Integration** - Secure OAuth and credentials-based authentication with bcrypt password hashing
 - **GitHub OAuth** - One-click sign-in with GitHub
-- **Guest Mode** - Try the app instantly with no signup required; chats aren't persisted and the model is locked to control API cost, enforced both in the UI and server-side in the AI actions
+- **No Account Required** - Every feature works without signing up; anonymous visitors get an httpOnly cookie id that their chats and BYOK keys are stored under. Signing in is optional
 - **User Preferences** - Persistent user settings and preferences
 - **Session Management** - Secure, persistent user sessions
 
@@ -48,7 +48,7 @@ Drop images in a `docs/screenshots/` folder and reference them here, e.g.:
 - **MongoDB** - Cloud-native database with optimized queries
 - **Chat Persistence** - Automatic saving of conversations for signed-in users
 - **Media Storage** - Integrated file and image attachment system
-- **Rate Limiting** - In-memory, per-instance rate limiting on guest AI calls (best-effort on serverless; see [Known Limitations](#-known-limitations))
+- **Rate Limiting** - In-memory, per-instance, per-IP rate limiting (60 messages/hour) on app-hosted AI calls for everyone; BYOK calls are exempt (best-effort on serverless; see [Known Limitations](#-known-limitations))
 
 ### 📱 Responsive Mobile-First Design
 - **Mobile Optimized** - Fully responsive design with mobile-specific UI
@@ -56,7 +56,7 @@ Drop images in a `docs/screenshots/` folder and reference them here, e.g.:
 - **Mobile Navigation** - Hamburger menu and gesture-friendly interface
 
 ### 🛠️ Developer Experience
-- **Automated Tests** - Vitest + React Testing Library covering provider routing, guest-mode gating, and core UI components
+- **Automated Tests** - Vitest + React Testing Library covering provider routing, server-side identity resolution, rate limiting, and core UI components
 - **CI Pipeline** - GitHub Actions runs lint, typecheck, and tests on every push/PR
 - **Advanced Logging System** - Toggleable, categorized logging for debugging
 - **Debug Panel** - Built-in development tools (desktop only)
@@ -150,7 +150,7 @@ ai-hq/
 │   │   └── server/
 │   │       └── db.tsx               # Database operations
 │   ├── lib/
-│   │   ├── rateLimiter.ts           # In-memory guest rate limiter
+│   │   ├── rateLimiter.ts           # In-memory per-IP rate limiter
 │   │   ├── auth/getServerUser.ts    # Verified-session helper (used by BYOK actions)
 │   │   ├── security/encryption.ts   # AES-256-GCM encryption for BYOK keys at rest
 │   │   └── providers/               # AI provider integrations
@@ -164,7 +164,7 @@ ai-hq/
 │   │   ├── logger.tsx                # Categorized logging system
 │   │   └── mediaUtils.tsx            # Media handling utilities
 │   ├── layout.tsx
-│   └── page.tsx                      # Landing page / guest entry / main app shell
+│   └── page.tsx                      # Main app shell + optional sign-in screen
 ├── .github/workflows/ci.yml          # CI: lint + typecheck + test
 ├── vitest.config.ts
 └── package.json
@@ -216,13 +216,13 @@ ENCRYPTION_KEY=your-encryption-key
 
 ## ⚠️ Known Limitations
 
-- **Guest rate limiting is in-memory and per-instance.** On serverless platforms (Vercel), each function instance has its own counter, so it's a best-effort deterrent rather than a hard cap. A hardened version would back it with Upstash Redis or similar shared store.
+- **Rate limiting is in-memory and per-instance.** On serverless platforms (Vercel), each function instance has its own counter, so it's a best-effort deterrent rather than a hard cap. A hardened version would back it with Upstash Redis or similar shared store.
 - **File/image upload attachments are UI-scaffolded but disabled** (`handleFileUpload` short-circuits) pending further work.
 - **`registry.tsx` and other server-only modules require `// @vitest-environment node`** in their tests, since `server-only` throws when imported in a DOM environment.
 
 ## 🎨 Design Notes
 
-- **Guest mode** is implemented as a synthetic, client-only `User` object (`{ isGuest: true }`) rather than a real session — it never touches NextAuth or MongoDB. Persistence calls and model switching are gated behind `user.isGuest` both in the UI and (defense in depth) inside the server actions themselves.
+- **Anonymous data is tied to one browser.** Visitors who don't sign in are identified by a random id in an httpOnly cookie (set by `src/middleware.ts`); their chats and BYOK keys are stored under `anon:<id>`. Clearing cookies loses that data, and it isn't merged into an account when the visitor later signs in. Server actions resolve identity server-side (`getRequestIdentity()`) and never trust an email passed from the client.
 - **Provider registry** (`lib/providers/registry.tsx`) routes a model ID string to the right provider client, so adding a new provider means implementing one interface and registering it — the rest of the app is provider-agnostic.
 - **Mobile-first layout** — the sidebar collapses to a hamburger menu and the chat composer is responsive down to small viewports.
 
@@ -246,7 +246,7 @@ docker run -p 3000:3000 ai-hq
 
 ## 🧬 What's Original vs. Starting Point
 
-This project began as an entry for Theo Browne's T3 Chat Cloneathon. Since then it's been substantially reworked: FuelIX-backed AI routing (plus a generic BYOK connector) via a provider registry, guest mode with server-enforced model/rate limits, credentials auth with bcrypt hashing, encrypted per-user BYOK key storage, the categorized logging system, the mobile-responsive layout, and the automated test suite/CI pipeline are all additions on top of the original T3-stack scaffold.
+This project began as an entry for Theo Browne's T3 Chat Cloneathon. Since then it's been substantially reworked: FuelIX-backed AI routing (plus a generic BYOK connector) via a provider registry, account-optional access with server-resolved identity and rate limits, credentials auth with bcrypt hashing, encrypted per-user BYOK key storage, the categorized logging system, the mobile-responsive layout, and the automated test suite/CI pipeline are all additions on top of the original T3-stack scaffold.
 
 ## 📝 License
 

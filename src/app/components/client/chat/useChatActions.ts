@@ -2,19 +2,18 @@ import { useState, useEffect } from 'react';
 import { newObjectIdAction, sendMessageToAIAction, generateTitleAction, saveChatToDbAction, updateChatModelAction } from '../../actions/dbActions';
 import { readStreamableValue } from 'ai/rsc';
 import { llmModels } from '../models';
-import { Chat, LLMModel, Message, MediaItem, User } from '../../../types/types';
+import { Chat, LLMModel, Message, MediaItem } from '../../../types/types';
 import { createNewChat } from '../../../utils/mediaUtils';
 import { logger } from '../../../utils/logger';
 
 type UseChatActionsArgs = {
   activeChat: Chat | undefined;
-  user?: User;
   setActiveChat: React.Dispatch<React.SetStateAction<Chat | undefined>>;
   setChatList: React.Dispatch<React.SetStateAction<Chat[]>>;
   extraModels?: LLMModel[];
 };
 
-export function useChatActions({ activeChat, user, setActiveChat, setChatList, extraModels }: UseChatActionsArgs) {
+export function useChatActions({ activeChat, setActiveChat, setChatList, extraModels }: UseChatActionsArgs) {
   const [input, setInput] = useState('');
   const [selectedModel, setSelectedModel] = useState(llmModels[0]);
   const [showModelChangeModal, setShowModelChangeModal] = useState(false);
@@ -55,7 +54,7 @@ export function useChatActions({ activeChat, user, setActiveChat, setChatList, e
   };
 
   const handleDeleteMessage = async (messageId: number) => {
-    if (!activeChat || !user?.email) return;
+    if (!activeChat) return;
 
     const updatedChat = {
       ...activeChat,
@@ -65,9 +64,7 @@ export function useChatActions({ activeChat, user, setActiveChat, setChatList, e
     setActiveChat(updatedChat);
 
     try {
-      if (!user?.isGuest) {
-        await saveChatToDbAction(updatedChat, user);
-      }
+      await saveChatToDbAction(updatedChat);
       setChatList(prev =>
         prev.map(chat =>
           chat._id === activeChat._id ? updatedChat : chat
@@ -79,7 +76,7 @@ export function useChatActions({ activeChat, user, setActiveChat, setChatList, e
   };
 
   const handleSaveEdit = async (messageId: number) => {
-    if (!activeChat || !user?.email) return;
+    if (!activeChat) return;
 
     if (editText.trim() === '') {
       if (confirm('Delete this message? This action cannot be undone.')) {
@@ -100,9 +97,7 @@ export function useChatActions({ activeChat, user, setActiveChat, setChatList, e
     setEditText('');
 
     try {
-      if (!user?.isGuest) {
-        await saveChatToDbAction(updatedChat, user);
-      }
+      await saveChatToDbAction(updatedChat);
       setChatList(prev =>
         prev.map(chat =>
           chat._id === activeChat._id ? updatedChat : chat
@@ -114,7 +109,7 @@ export function useChatActions({ activeChat, user, setActiveChat, setChatList, e
   };
 
   const handleRegenerateMessage = async (messageId: number) => {
-    if (!activeChat || !user?.email) return;
+    if (!activeChat) return;
 
     const messageIndex = activeChat.chatHistory.findIndex(msg => msg.id === messageId);
     if (messageIndex === -1) return;
@@ -133,7 +128,7 @@ export function useChatActions({ activeChat, user, setActiveChat, setChatList, e
   };
 
   const handleBranchChat = async (messageId: number) => {
-    if (!activeChat || !user?.email) return;
+    if (!activeChat) return;
 
     const messageIndex = activeChat.chatHistory.findIndex(msg => msg.id === messageId);
     if (messageIndex === -1) return;
@@ -153,9 +148,7 @@ export function useChatActions({ activeChat, user, setActiveChat, setChatList, e
       };
 
       try {
-        if (!user?.isGuest) {
-          await saveChatToDbAction(branchedChat, user);
-        }
+        await saveChatToDbAction(branchedChat);
         setChatList(prev => [...prev, branchedChat]);
         setActiveChat(branchedChat);
       } catch (error) {
@@ -177,11 +170,11 @@ export function useChatActions({ activeChat, user, setActiveChat, setChatList, e
   };
 
   const confirmModelChange = async () => {
-    if (!pendingModelChange || !activeChat || !user?.email) return;
+    if (!pendingModelChange || !activeChat) return;
 
     try {
       // Update chat model in database
-      const updateResult = await updateChatModelAction(activeChat._id, pendingModelChange.id, user);
+      const updateResult = await updateChatModelAction(activeChat._id, pendingModelChange.id);
 
       if (updateResult.success) {
         // Update local state
@@ -234,7 +227,6 @@ export function useChatActions({ activeChat, user, setActiveChat, setChatList, e
 
   const handleSend = async () => {
     if (input.trim() === '' || isSending) return;
-    if (!user?.email) throw new Error('Something went wrong, user not authenticated');
     try {
       const messageInput = input;
 
@@ -267,7 +259,7 @@ export function useChatActions({ activeChat, user, setActiveChat, setChatList, e
         setActiveChat(chatToUpdate);
       } else {
         const idResp = await newObjectIdAction();
-        const titleResp = await generateTitleAction(selectedModel.id, userMessage, user);
+        const titleResp = await generateTitleAction(selectedModel.id, userMessage);
         if (idResp.success && idResp.data && titleResp.success && titleResp.data) {
           const chatId = JSON.parse(idResp.data);
           const title = titleResp.data;
@@ -280,7 +272,7 @@ export function useChatActions({ activeChat, user, setActiveChat, setChatList, e
 
 
       // Call the Server Action
-      const result = await sendMessageToAIAction(selectedModel.id, chatToUpdate, user);
+      const result = await sendMessageToAIAction(selectedModel.id, chatToUpdate);
 
       // Add AI placeholder message
       const aiMessagePlaceholder: Message = {
@@ -369,10 +361,8 @@ export function useChatActions({ activeChat, user, setActiveChat, setChatList, e
       }
       logger.chat('mediaItems for chat update:', chatToUpdate.mediaItems);
 
-      if (!user?.isGuest) {
-        const saveResp = await saveChatToDbAction(chatToUpdate, user);
-        if (!saveResp.success) throw new Error("Could not save chat to DB!" + saveResp.error);
-      }
+      const saveResp = await saveChatToDbAction(chatToUpdate);
+      if (!saveResp.success) throw new Error("Could not save chat to DB!" + saveResp.error);
 
       setChatList(
         prev => {
@@ -428,15 +418,13 @@ export function useChatActions({ activeChat, user, setActiveChat, setChatList, e
       }
 
       // Save the updated chat to database
-      if (!user?.isGuest) {
-        try {
-          const saveResp = await saveChatToDbAction(chatToUpdate, user);
-          if (!saveResp.success) {
-            logger.error("Could not save error chat to DB:", saveResp.error);
-          }
-        } catch (saveError) {
-          logger.error("Error saving chat to DB:", saveError);
+      try {
+        const saveResp = await saveChatToDbAction(chatToUpdate);
+        if (!saveResp.success) {
+          logger.error("Could not save error chat to DB:", saveResp.error);
         }
+      } catch (saveError) {
+        logger.error("Error saving chat to DB:", saveError);
       }
     }
   };

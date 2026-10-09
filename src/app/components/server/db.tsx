@@ -4,6 +4,7 @@ import { randomUUID } from 'crypto';
 import { MongoClient, ServerApiVersion, ObjectId } from 'mongodb';
 import { Chat, BYOKConnectionMeta } from "../../types/types"
 import { encryptSecret, decryptSecret, EncryptedSecret } from '../../lib/security/encryption';
+import { isAnonymousIdentity } from '../../lib/auth/anonymous';
 
 const MAX_BYOK_CONNECTIONS = 10;
 
@@ -179,6 +180,7 @@ export async function updateChatModel(chatId: any, newModel: string, user:{name?
 export async function verifyPass(credentials: { email?: string, password?: string }) {
   
   if (credentials.email && credentials.password) {
+  if (isAnonymousIdentity(credentials.email.toLowerCase())) throw new Error('Account not found (User/Email is case sensitive)');
   try{
           const db = await getDatabase();
           const res = await db.collection('users').findOne({ "email": credentials.email });
@@ -200,6 +202,10 @@ export async function verifyPass(credentials: { email?: string, password?: strin
 
 export async function createUser(formData: string) {
   try{
+    // Anonymous visitors' data is stored under `anon:<id>` in the email field, so that prefix must never be claimable
+    if (isAnonymousIdentity(String(JSON.parse(formData).email ?? '').toLowerCase())) {
+      throw new Error('Invalid email address');
+    }
     const db = await getDatabase();
     const emailCheck = await db.collection('users').findOne({ "email": JSON.parse(formData).email });
     if (emailCheck !== null) {
@@ -363,9 +369,9 @@ export async function createOrUpdateOAuthUser(email: string, name?: string | nul
 }
 
 // BYOK (bring-your-own-key) connections. All functions here take an `email`
-// that callers must have already verified via getVerifiedEmail() — this
-// module never re-derives trust, since a leaked API key is worse than a
-// leaked chat.
+// (a session email or `anon:<id>`) that callers must have resolved via
+// getRequestIdentity() — this module never re-derives trust, since a leaked
+// API key is worse than a leaked chat.
 
 export async function listByokConnections(email: string): Promise<BYOKConnectionMeta[]> {
   try {
@@ -428,9 +434,16 @@ export async function addByokConnection(email: string, connection: { label: stri
       encryptedApiKey: encryptSecret(connection.apiKey),
     };
 
+    // Anonymous visitors have no users record until they save their first key
+    const anonymous = isAnonymousIdentity(email);
     const result = await db.collection('users').updateOne(
       { "email": email },
-      { $push: { "preferences.byokConnections": stored as any }, $set: { "updatedAt": new Date() } }
+      {
+        $push: { "preferences.byokConnections": stored as any },
+        $set: { "updatedAt": new Date() },
+        ...(anonymous ? { $setOnInsert: { "isAnonymous": true, "createdAt": new Date() } } : {}),
+      },
+      { upsert: anonymous }
     );
 
     if (result.matchedCount === 0) {
